@@ -1,11 +1,11 @@
-# Documentation / Build Scripts
-TrustFed_PRD.pdf
-build_prd_pdf.py
-
 # Dependencies & Build Outputs
 **/node_modules/
 **/dist/
 **/dist-ssr/
+.venv/
+venv/
+env/
+ENV/
 
 # Logs
 logs
@@ -28,7 +28,7 @@ __pycache__/
 *.so
 .Python
 
-# Large Archives
+# Large Archives & Temporary Datasets
 *.zip
 *.tar.gz
 

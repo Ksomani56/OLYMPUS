@@ -28,7 +28,7 @@ import shap
 
 
 ROOT = Path(__file__).parent
-ARTIFACT = ROOT / "artifacts" / "paysim" / "model.joblib"
+ARTIFACT = (ROOT / "artifacts" / "paysim" / "model.joblib") if (ROOT / "artifacts" / "paysim" / "model.joblib").exists() else (ROOT.parent / "artifacts" / "paysim" / "model.joblib")
 ALLOWED_TYPES = {"CASH_IN", "CASH_OUT", "DEBIT", "PAYMENT", "TRANSFER"}
 SOURCE_NUMBERS = ["step", "amount", "oldbalanceOrg", "oldbalanceDest",
                   "newbalanceOrig", "newbalanceDest"]

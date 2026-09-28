@@ -99,9 +99,9 @@ flowchart TD
     subgraph ServerLayer["⚙️ Backend Risk Engine (FastAPI + Uvicorn :8000)"]
         RouteAssess["/api/assess"]
         RouteHealth["/health"]
-        ModelBanks["artifacts/paysim/model.joblib (PaySim GBDT)"]
-        ModelCredit["artifacts/creditfraud/model.joblib (500-Tree XGBoost)"]
-        ModelInsurance["artifacts/insurance/model.joblib (54-Feature GBDT)"]
+        ModelBanks["backend/artifacts/paysim/model.joblib (PaySim GBDT)"]
+        ModelCredit["backend/artifacts/creditfraud/model.joblib (500-Tree XGBoost)"]
+        ModelInsurance["backend/artifacts/insurance/model.joblib (54-Feature GBDT)"]
         SHAPEngine["SHAP TreeExplainer (Cached In-Memory)"]
         LLMEngine["Google Gemini 2.5 Flash LLM Service"]
     end
@@ -168,6 +168,32 @@ The platform provides an interactive sandbox for evaluating financial fraud risk
 
 ---
 
+## 📂 Repository Structure
+
+```
+TrustFed/
+├── backend/                    # FastAPI Risk Engine & Machine Learning Pipelines
+│   ├── artifacts/              # Serialized ML models (GBDT, XGBoost, client silos)
+│   ├── risk_api.py             # Primary entry point
+│   ├── risks_api.py            # API routes, inference pipeline & Gemini explainability
+│   ├── predict_paysim.py       # PaySim inference engine
+│   ├── train_risk_models.py    # Federated model training suite
+│   ├── requirements.txt        # Backend dependencies
+│   ├── .env.example            # Backend environment template
+│   └── README.md               # Backend documentation
+├── frontend/                   # Interactive Web Application
+│   ├── src/                    # React 19 + TypeScript components & views
+│   ├── public/                 # Static assets & typography
+│   ├── package.json            # Node dependencies & build scripts
+│   └── README.md               # Frontend documentation
+└── docs/                       # Architecture specifications & documentation
+    ├── API_INTEGRATION.md      # API integration specifications
+    ├── flow.md                 # System dataflow & protocol definitions
+    └── TrustFed_PRD.pdf        # Product Requirements Document
+```
+
+---
+
 ## 🚀 Quickstart & Setup Guide
 
 ### Prerequisites
@@ -176,20 +202,33 @@ The platform provides an interactive sandbox for evaluating financial fraud risk
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/Jayz-yuors/ENIGMA_Stocksensei.git
-cd ENIGMA_Stocksensei
+git clone https://github.com/Sahityasahani1/TrustFed.git
+cd TrustFed
 ```
 
 ### 2. Configure Environment Variables
-Create a `.env` file in the root directory:
+Create a `.env` file in the `backend/` directory (or repository root):
+```bash
+cp backend/.env.example backend/.env
+```
+Edit `backend/.env`:
 ```env
 GEMINI_API_KEY="your-google-gemini-api-key"
+GEMINI_MODEL="gemini-2.5-flash"
+FRONTEND_ORIGINS="http://localhost:3000,http://localhost:5173"
 ```
 
 ### 3. Start the Backend Risk & LLM API
 ```bash
-# Install Python dependencies
-pip install fastapi uvicorn google-genai numpy scikit-learn xgboost shap python-dotenv requests
+# Navigate to backend
+cd backend
+
+# (Optional) Create and activate virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: .\venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
 
 # Start Uvicorn server on port 8000
 python -m uvicorn risk_api:app --host 0.0.0.0 --port 8000 --reload

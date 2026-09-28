@@ -26,13 +26,15 @@ from predict_paysim import assess_transaction
 
 ROOT = Path(__file__).parent
 load_dotenv(ROOT / ".env")
+load_dotenv(ROOT.parent / ".env")
 
+ARTIFACTS_DIR = (ROOT / "artifacts") if (ROOT / "artifacts").exists() else (ROOT.parent / "artifacts")
 MODEL_PATHS = {
-    "banks": ROOT / "artifacts" / "paysim" / "model.joblib",
-    "creditfraud": ROOT / "artifacts" / "creditfraud" / "model.joblib",
-    "lenders": ROOT / "artifacts" / "creditfraud" / "model.joblib",
-    "insurance": ROOT / "artifacts" / "insurance" / "model.joblib",
-    "insurers": ROOT / "artifacts" / "insurance" / "model.joblib",
+    "banks": ARTIFACTS_DIR / "paysim" / "model.joblib",
+    "creditfraud": ARTIFACTS_DIR / "creditfraud" / "model.joblib",
+    "lenders": ARTIFACTS_DIR / "creditfraud" / "model.joblib",
+    "insurance": ARTIFACTS_DIR / "insurance" / "model.joblib",
+    "insurers": ARTIFACTS_DIR / "insurance" / "model.joblib",
 }
 
 GEMINI_MODEL_PREFERENCE = [
@@ -351,7 +353,7 @@ def gemini_model_order(api_key):
 
 
 def gemini_reasoning(domain, ml_json):
-    api_key = os.getenv("GEMINI_API_Key")
+    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GEMINI_API_Key")
     if not api_key:
         return local_reasoning(domain, ml_json)
 
@@ -452,9 +454,9 @@ def gemini_reasoning(domain, ml_json):
 def health():
     return {
         "status": "ok",
-        "models": {name: {"available": path.is_file(), "artifact": str(path.relative_to(ROOT))}
+        "models": {name: {"available": path.is_file(), "artifact": str(path.relative_to(ARTIFACTS_DIR.parent))}
                    for name, path in MODEL_PATHS.items()},
-        "gemini_configured": bool(os.getenv("GEMINI_API_Key")),
+        "gemini_configured": bool(os.getenv("GEMINI_API_KEY") or os.getenv("GEMINI_API_Key")),
     }
 
 
