@@ -179,17 +179,13 @@ TrustFed/
 │   ├── predict_paysim.py       # PaySim inference engine
 │   ├── train_risk_models.py    # Federated model training suite
 │   ├── requirements.txt        # Backend dependencies
-│   ├── .env.example            # Backend environment template
 │   └── README.md               # Backend documentation
 ├── frontend/                   # Interactive Web Application
 │   ├── src/                    # React 19 + TypeScript components & views
 │   ├── public/                 # Static assets & typography
 │   ├── package.json            # Node dependencies & build scripts
 │   └── README.md               # Frontend documentation
-└── docs/                       # Architecture specifications & documentation
-    ├── API_INTEGRATION.md      # API integration specifications
-    ├── flow.md                 # System dataflow & protocol definitions
-    └── TrustFed_PRD.pdf        # Product Requirements Document
+└── API_INTEGRATION.md          # API integration specifications
 ```
 
 ---
@@ -208,10 +204,6 @@ cd TrustFed
 
 ### 2. Configure Environment Variables
 Create a `.env` file in the `backend/` directory (or repository root):
-```bash
-cp backend/.env.example backend/.env
-```
-Edit `backend/.env`:
 ```env
 GEMINI_API_KEY="your-google-gemini-api-key"
 GEMINI_MODEL="gemini-2.5-flash"
