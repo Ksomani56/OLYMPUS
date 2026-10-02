@@ -238,18 +238,3 @@ Open **`http://localhost:5173`** in your browser.
 
 ---
 
-## ⏱️ 3-Minute Demo Pitch for Judges
-
-1. **Minute 1: The Problem (Intro Page)**  
-   Highlight the dilemma: fraud syndicates jump between banks, wallets, and lenders, but institutions cannot pool customer data without breaking GDPR. Show the **Isolated Silo Card** approving a fraudulent transfer due to missing network context.
-2. **Minute 2: The Privacy Shield (Tabs 1, 2, 3)**  
-   Demonstrate the live telemetry pill bar: **Raw Records: 0**, **SecAgg+: 3/3**, **DP: $\epsilon=2.45$**. Explain how local gradients are masked cryptographically before federation.
-3. **Minute 3: The Payoff (Model Showdown & LLM Audit)**  
-   Click any high-risk preset in Tab 1, 2, or 3, then click **Calculate & Screen**. Watch the **OLYMPUS Global Consensus Model** catch the attack with high confidence, while the **Google Gemini LLM layer** instantly renders a plain-English, regulatory-compliant audit brief with SHAP driver attributions.
-
----
-
-<div align="center">
-  <b>OLYMPUS • Privacy-Preserving Federated Fraud Intelligence</b><br/>
-  <i>Developed for the ENIGMA Hackathon.</i>
-</div>
