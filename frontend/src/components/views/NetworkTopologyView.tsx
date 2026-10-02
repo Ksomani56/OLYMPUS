@@ -126,7 +126,7 @@ export const NetworkTopologyView: React.FC = () => {
             <div className="inline-flex p-3 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 mb-2">
               <Server className="w-7 h-7" />
             </div>
-            <h3 className="text-base font-bold text-slate-100">TrustFed Central Coordinator</h3>
+            <h3 className="text-base font-bold text-slate-100">OLYMPUS Central Coordinator</h3>
             <p className="text-xs text-slate-400 font-mono mt-0.5">Flower FedAvg • SecAgg+ Cryptographic Aggregator</p>
 
             <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-around text-xs">

@@ -52,7 +52,7 @@ export const IntroPage: React.FC<IntroPageProps> = ({
                 <ShieldCheck className="w-8 h-8 text-white" />
               </div>
               <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-white font-display">
-                Trust<span className="text-emerald-300">Fed</span>
+                OLYMPUS
               </h1>
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-white/20 text-white border border-white/30">
                 MVP v1.0
@@ -64,7 +64,7 @@ export const IntroPage: React.FC<IntroPageProps> = ({
             </h2>
 
             <p className="text-base sm:text-lg text-white/90 font-medium max-w-2xl mx-auto leading-relaxed">
-              TrustFed enables banks, digital wallets, lenders, and insurers to train high-accuracy joint fraud models without sharing a single customer record — powered by Flower FedAvg, SecAgg+ Diffie-Hellman encryption & Rényi Differential Privacy.
+              OLYMPUS enables banks, digital wallets, lenders, and insurers to train high-accuracy joint fraud models without sharing a single customer record — powered by Flower FedAvg, SecAgg+ Diffie-Hellman encryption & Rényi Differential Privacy.
             </p>
 
             {/* 3D ACTION BUTTONS */}
@@ -152,12 +152,12 @@ export const IntroPage: React.FC<IntroPageProps> = ({
                 <div className="p-2.5 rounded-2xl bg-amber-50/90 border border-amber-200/80 flex items-start gap-2 text-[11px] text-amber-800">
                   <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
                   <span>
-                    <strong>False Negative:</strong> Silo cannot detect rapid cross-border wallet mule hops without TrustFed.
+                    <strong>False Negative:</strong> Silo cannot detect rapid cross-border wallet mule hops without OLYMPUS.
                   </span>
                 </div>
               </div>
 
-              {/* Card 2: Center Elevated Hero (TrustFed Global Consensus Core) */}
+              {/* Card 2: Center Elevated Hero (OLYMPUS Global Consensus Core) */}
               <div 
                 className="w-full md:w-[380px] rounded-[2rem] p-6 bg-white/95 backdrop-blur-3xl border-2 border-emerald-400 shadow-[0_25px_60px_-15px_rgba(16,185,129,0.35)] transition-all duration-500 hover:scale-105 z-20 order-1 md:order-2 md:-translate-y-5"
                 style={{ transformStyle: 'preserve-3d' }}
@@ -169,7 +169,7 @@ export const IntroPage: React.FC<IntroPageProps> = ({
                     </div>
                     <div>
                       <h3 className="text-sm font-extrabold text-slate-900">
-                        TrustFed Global Engine
+                        OLYMPUS Global Engine
                       </h3>
                       <div className="flex items-center gap-1.5 mt-0.5">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -270,13 +270,13 @@ export const IntroPage: React.FC<IntroPageProps> = ({
       <div className="space-y-6 pt-4">
         <div className="text-center max-w-3xl mx-auto space-y-2">
           <span className="text-xs font-mono uppercase text-blue-700 font-bold tracking-wider px-3 py-1 rounded-full bg-blue-50 border border-blue-200">
-            • How TrustFed Works
+            • How OLYMPUS Works
           </span>
           <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
             Collaborate on intelligence, never on customer records.
           </h3>
           <p className="text-sm text-slate-600 font-medium leading-relaxed">
-            Explore the 3 foundational pillars of the TrustFed architecture designed specifically to solve cross-institutional financial fraud without privacy compromise.
+            Explore the 3 foundational pillars of the OLYMPUS architecture designed specifically to solve cross-institutional financial fraud without privacy compromise.
           </p>
         </div>
 
@@ -330,7 +330,7 @@ export const IntroPage: React.FC<IntroPageProps> = ({
               <span className="text-[10px] font-mono uppercase text-emerald-600 font-bold tracking-wider">Module 03</span>
               <h4 className="text-base font-bold text-slate-900 mt-1">The Fraud Showdown & Explainability</h4>
               <p className="text-xs text-slate-600 mt-1.5 leading-relaxed font-medium">
-                Direct side-by-side comparison: Bank silo misses attack (13/100) vs TrustFed catches it (87/100) with plain-language SHAP waterfall reason codes.
+                Direct side-by-side comparison: Bank silo misses attack (13/100) vs OLYMPUS catches it (87/100) with plain-language SHAP waterfall reason codes.
               </p>
             </div>
             <div className="pt-2">

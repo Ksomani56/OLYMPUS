@@ -346,7 +346,7 @@ export const SilosAndNetworkView: React.FC<SilosAndNetworkViewProps> = ({
 
                   <div className="flex flex-wrap items-center gap-2 text-xs font-mono pt-1">
                     <span className="px-3 py-1 rounded-xl bg-white border border-blue-200 text-blue-800 font-bold shadow-sm">
-                      URI: {selectedInstitution}.trustfed.internal:50051
+                      URI: {selectedInstitution}.olympus.internal:50051
                     </span>
                     <span className="px-3 py-1 rounded-xl bg-white border border-emerald-200 text-emerald-800 font-bold shadow-sm">
                       Storage: RAM Arrow RecordBatch (0 WAN Egress)
@@ -685,7 +685,7 @@ export const SilosAndNetworkView: React.FC<SilosAndNetworkViewProps> = ({
                 <div className="inline-flex p-3 rounded-2xl bg-gradient-to-tr from-blue-600 to-emerald-500 text-white mb-3 shadow-lg shadow-blue-500/25">
                   <Server className="w-8 h-8" />
                 </div>
-                <h3 className="text-base font-extrabold text-slate-900">TrustFed Central Coordinator</h3>
+                <h3 className="text-base font-extrabold text-slate-900">OLYMPUS Central Coordinator</h3>
                 <p className="text-xs text-blue-700 font-mono mt-0.5 font-bold">Flower FedAvg • SecAgg+ Cryptographic Aggregator</p>
 
                 <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-around text-xs">

@@ -360,7 +360,7 @@ export const FederatedEngineView: React.FC<FederatedEngineViewProps> = ({
                       <Line 
                         type="monotone" 
                         dataKey="federatedDP" 
-                        name="TrustFed (SecAgg + DP)" 
+                        name="OLYMPUS (SecAgg + DP)" 
                         stroke="#10B981" 
                         strokeWidth={3} 
                         dot={{ r: 4, fill: '#10B981' }}
@@ -473,7 +473,7 @@ export const FederatedEngineView: React.FC<FederatedEngineViewProps> = ({
                 Rényi Differential Privacy (RDP) Budget Accountant (PRD FR-6)
               </h3>
               <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                TrustFed applies Gaussian noise perturbation and gradient clipping to bound information leakage from individual training examples.
+                OLYMPUS applies Gaussian noise perturbation and gradient clipping to bound information leakage from individual training examples.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-3">

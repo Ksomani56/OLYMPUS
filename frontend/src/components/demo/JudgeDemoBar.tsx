@@ -33,7 +33,7 @@ export const JudgeDemoBar: React.FC<JudgeDemoBarProps> = ({
       num: 3,
       time: 'Min 3',
       title: 'The Fraud Showdown',
-      desc: 'Silo misses attack (13/100) vs TrustFed catches it (87/100 + SHAP)',
+      desc: 'Silo misses attack (13/100) vs OLYMPUS catches it (87/100 + SHAP)',
     },
   ];
 
@@ -59,7 +59,7 @@ export const JudgeDemoBar: React.FC<JudgeDemoBarProps> = ({
                 Institutions collaborate on intelligence, never on customer records.
               </h2>
               <p className="text-sm text-white/85 max-w-2xl font-medium leading-relaxed">
-                TrustFed enables banks, digital wallets, lenders, and insurers to train joint fraud models with mathematical zero-knowledge privacy guarantees.
+                OLYMPUS enables banks, digital wallets, lenders, and insurers to train joint fraud models with mathematical zero-knowledge privacy guarantees.
               </p>
             </div>
 

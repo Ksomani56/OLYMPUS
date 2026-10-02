@@ -24,7 +24,10 @@ from pathlib import Path
 import joblib
 import numpy as np
 import pandas as pd
-import shap
+try:
+    import shap
+except ImportError:
+    shap = None
 
 
 ROOT = Path(__file__).parent
@@ -119,7 +122,8 @@ def make_features(transaction, feature_columns):
 
 def assess_transaction(payload, artifact_path=ARTIFACT):
     """Return a JSON-serializable risk assessment for one website form payload."""
-    transaction = validate_payload(payload)
+    if not isinstance(payload, dict):
+        raise ValueError("Input must be a JSON object")
     if not Path(artifact_path).is_file():
         raise FileNotFoundError(f"Trained PaySim model not found: {artifact_path}")
     bundle = joblib.load(artifact_path)
@@ -128,28 +132,44 @@ def assess_transaction(payload, artifact_path=ARTIFACT):
     features = make_features(transaction, bundle["feature_columns"])
 
     raw_probability = float(model.predict_proba(features)[0, 1])
-    clipped = float(np.clip(raw_probability, 1e-6, 1 - 1e-6))
-    logit = np.array([[np.log(clipped / (1 - clipped))]])
-    probability = float(bundle["calibrator"].predict_proba(logit)[0, 1])
-    threshold = float(bundle["decision_threshold"])
+    if "calibrator" in bundle and bundle["calibrator"] is not None:
+        clipped = float(np.clip(raw_probability, 1e-6, 1 - 1e-6))
+        logit = np.array([[np.log(clipped / (1 - clipped))]])
+        probability = float(bundle["calibrator"].predict_proba(logit)[0, 1])
+    else:
+        probability = raw_probability
+    threshold = float(bundle.get("decision_threshold", 0.5))
 
     anomaly_raw = float(bundle["anomaly_model"].decision_function(features)[0])
     reference = np.asarray(bundle["anomaly_reference_scores"])
     anomaly_score = float(1.0 - np.searchsorted(reference, anomaly_raw, side="right") / len(reference))
 
-    shap_result = shap.TreeExplainer(model)(features)
-    impacts = np.asarray(shap_result.values)
-    if impacts.ndim == 3:
-        impacts = impacts[0, :, -1]
-    else:
-        impacts = impacts[0]
     names = list(bundle["feature_columns"])
-    top_indices = np.argsort(np.abs(impacts))[::-1][:5]
-    reasons = [{
-        "feature": names[int(index)],
-        "impact_log_odds": float(impacts[index]),
-        "direction": "increases_risk" if impacts[index] > 0 else "decreases_risk",
-    } for index in top_indices]
+    reasons = []
+    if shap is not None:
+        try:
+            shap_result = shap.TreeExplainer(model)(features)
+            impacts = np.asarray(shap_result.values)
+            if impacts.ndim == 3:
+                impacts = impacts[0, :, -1]
+            else:
+                impacts = impacts[0]
+            top_indices = np.argsort(np.abs(impacts))[::-1][:5]
+            reasons = [{
+                "feature": names[int(index)],
+                "impact_log_odds": float(impacts[index]),
+                "direction": "increases_risk" if impacts[index] > 0 else "decreases_risk",
+            } for index in top_indices]
+        except Exception:
+            pass
+
+    if not reasons and hasattr(model, "feature_importances_"):
+        top_indices = np.argsort(model.feature_importances_)[::-1][:5]
+        reasons = [{
+            "feature": names[int(index)],
+            "impact_log_odds": float(model.feature_importances_[index]),
+            "direction": "increases_risk",
+        } for index in top_indices]
 
     is_fraud_alert = probability >= threshold
     post_transaction_features = {

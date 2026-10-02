@@ -37,7 +37,7 @@ export const MAIN_TABS: MainTabDef[] = [
       {
         id: 'showdown',
         label: '1. Transaction Feature Inputs & Showdown',
-        desc: 'Interactive sandbox testing step, type, amount, oldbalanceOrg & oldbalanceDest against Silo vs TrustFed models.',
+        desc: 'Interactive sandbox testing step, type, amount, oldbalanceOrg & oldbalanceDest against Silo vs OLYMPUS models.',
         icon: <ShieldAlert className="w-4 h-4 text-emerald-600" />,
         badge: 'PaySim Model',
       },

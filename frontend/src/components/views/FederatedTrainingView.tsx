@@ -297,7 +297,7 @@ export const FederatedTrainingView: React.FC = () => {
                 <Line 
                   type="monotone" 
                   dataKey="federatedDP" 
-                  name="TrustFed (FedAvg + SecAgg + DP)" 
+                  name="OLYMPUS (FedAvg + SecAgg + DP)" 
                   stroke="#06b6d4" 
                   strokeWidth={3} 
                   dot={{ r: 3, fill: '#06b6d4' }}

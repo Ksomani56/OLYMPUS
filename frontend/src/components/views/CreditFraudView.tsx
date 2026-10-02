@@ -675,7 +675,7 @@ export const CreditFraudView: React.FC<CreditFraudViewProps> = ({
                                 `**Key Feature Evidence (SHAP Drivers)**:\n` +
                                 `EXT_SOURCE_3 and EXT_SOURCE_2 external bureau ratings strongly shift default odds. Debt leverage of ${debtToIncome}x principal-to-income and ${annuityIncomeRatio}% annuity drawdown dictate cash-flow stress.\n\n` +
                                 `**Network Context & Silo Parity**:\n` +
-                                `Isolated lenders only observe in-house applicant submissions, missing cross-lender simultaneous borrowing. The TrustFed federated network catches synthetic identity stacking without revealing applicant PII.\n\n` +
+                                `Isolated lenders only observe in-house applicant submissions, missing cross-lender simultaneous borrowing. The OLYMPUS federated network catches synthetic identity stacking without revealing applicant PII.\n\n` +
                                 `**Recommended Verification Checks**:\n` +
                                 `Validate secondary employment verification, review cross-bureau credit inquiries in the last 90 days, and verify goods purchase invoice authenticity.`
                               ))
@@ -821,11 +821,11 @@ export const CreditFraudView: React.FC<CreditFraudViewProps> = ({
                     </div>
                   </TiltedCard>
 
-                  {/* TrustFed Federated Global Model */}
+                  {/* OLYMPUS Federated Global Model */}
                   <TiltedCard maxTilt={8} className="p-6 border-2 border-emerald-400 bg-gradient-to-b from-white to-emerald-50/40 shadow-2xl">
                     <BorderBeam duration={5} colorFrom="#0284C7" colorTo="#10B981" />
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-mono font-bold text-emerald-900">TrustFed Federated Global</span>
+                      <span className="text-xs font-mono font-bold text-emerald-900">OLYMPUS Federated Global</span>
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold">
                         {backendStatus === 'connected' ? 'creditfraud + Gemini' : 'SecAgg + DP'}
                       </span>

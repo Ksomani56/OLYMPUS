@@ -152,12 +152,12 @@ export const Hero3DStage: React.FC<Hero3DStageProps> = ({
               <div className="p-2.5 rounded-2xl bg-amber-50/90 border border-amber-200/80 flex items-start gap-2 text-[11px] text-amber-800">
                 <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
                 <span>
-                  <strong>False Negative:</strong> Silo cannot detect rapid cross-border wallet mule hops without TrustFed.
+                  <strong>False Negative:</strong> Silo cannot detect rapid cross-border wallet mule hops without OLYMPUS.
                 </span>
               </div>
             </div>
 
-            {/* Card 2: Center Elevated Hero (TrustFed Global Consensus Core) */}
+            {/* Card 2: Center Elevated Hero (OLYMPUS Global Consensus Core) */}
             <div 
               className="w-full md:w-[380px] rounded-[2rem] p-6 bg-white/95 backdrop-blur-3xl border-2 border-purple-300 shadow-[0_25px_60px_-15px_rgba(124,58,237,0.35)] transition-all duration-500 hover:scale-105 z-20 order-1 md:order-2 md:-translate-y-5"
               style={{ transformStyle: 'preserve-3d' }}
@@ -169,7 +169,7 @@ export const Hero3DStage: React.FC<Hero3DStageProps> = ({
                   </div>
                   <div>
                     <h3 className="text-sm font-extrabold text-slate-900 font-display">
-                      TrustFed Global Engine
+                      OLYMPUS Global Engine
                     </h3>
                     <div className="flex items-center gap-1.5 mt-0.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />

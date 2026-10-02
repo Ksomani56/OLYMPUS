@@ -36,3 +36,13 @@ __pycache__/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Agent Knowledge & Planning Docs
+.agent/
+MD/
+AGENT.md
+AGENTS.md
+ARCHITECTURE_AUDIT.md
+*.md
+!README.md
+!**/README.md

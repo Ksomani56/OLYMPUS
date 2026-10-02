@@ -159,8 +159,8 @@ export function App() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xl font-extrabold tracking-tight text-slate-900 font-display">
-                  Trust<span className="bg-gradient-to-r from-blue-600 via-cyan-500 to-emerald-500 bg-clip-text text-transparent">Fed</span>
+                <span className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-blue-600 via-cyan-500 to-emerald-500 bg-clip-text text-transparent font-display">
+                  OLYMPUS
                 </span>
                 <span className="hidden sm:inline-block px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold bg-gradient-to-r from-blue-100 to-emerald-100 text-emerald-800 border border-emerald-300">
                   MVP v1.0
@@ -344,7 +344,7 @@ export function App() {
 
           <div className="text-center text-xs text-slate-500 space-y-1">
             <p className="font-bold text-slate-800">
-              TrustFed • Privacy-Preserving Federated Fraud Intelligence Architecture
+              OLYMPUS • Privacy-Preserving Federated Fraud Intelligence Architecture
             </p>
             <p className="text-[11px] text-slate-400 font-mono">
               "Institutions collaborate on intelligence, never on customer records." Designed for the ENIGMA Hackathon.

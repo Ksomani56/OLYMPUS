@@ -15,8 +15,11 @@ import joblib
 import numpy as np
 import pandas as pd
 import requests
-import shap
 from dotenv import load_dotenv
+try:
+    import shap
+except ImportError:
+    shap = None
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -367,7 +370,7 @@ def gemini_reasoning(domain, ml_json):
         }
 
     prompt = (
-        "You are the authoritative explanation layer for the TrustFed / ENIGMA Financial Risk Screening Platform. "
+        "You are the authoritative explanation layer for the OLYMPUS / ENIGMA Financial Risk Screening Platform. "
         "Your role is to interpret the model's authoritative assessment for compliance officers, fraud analysts, and risk teams.\n\n"
         "Guidelines:\n"
         "1. Write a clear, concise, structured response using exactly these markdown labeled sections:\n"
@@ -460,12 +463,25 @@ def health():
     }
 
 
+@app.get("/status")
+@app.get("/api/status")
+def status():
+    return {
+        "status": "healthy",
+        "service": "OLYMPUS Risk Inference API",
+        "version": "1.0.0",
+        "models_loaded": {name: path.is_file() for name, path in MODEL_PATHS.items()},
+        "gemini_configured": bool(os.getenv("GEMINI_API_KEY") or os.getenv("GEMINI_API_Key")),
+    }
+
+
 @app.get("/")
 def root():
     return {
         "service": "ENIGMA Risk Inference API",
         "status": "running",
         "health": "/health",
+        "status_endpoint": "/status",
         "interactive_api_docs": "/docs",
         "assessment_endpoint": "POST /api/assess",
         "message": "Use /docs to submit a risk assessment; the root URL does not accept prediction inputs.",
@@ -478,7 +494,7 @@ def assess(request: AssessRequest):
         # Required ordering: ML inference first; the explanation API receives
         # only the structured ML result, never the raw form payload.
         ml_json = run_ml(request.domain, request.user_input)
-    except FileNotFoundError as exc:
+    except (FileNotFoundError, ModuleNotFoundError, ImportError) as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except NotImplementedError as exc:
         raise HTTPException(status_code=501, detail=str(exc)) from exc

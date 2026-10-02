@@ -264,14 +264,14 @@ export const RiskScoringView: React.FC = () => {
               </div>
             </SpotlightCard>
 
-            {/* TrustFed Global Federated Model */}
+            {/* OLYMPUS Global Federated Model */}
             <SpotlightCard 
               className="p-4 border-cyan-500/40 bg-gradient-to-b from-slate-900 to-cyan-950/20 shadow-xl"
               spotlightColor="rgba(6, 182, 212, 0.25)"
             >
               <BorderBeam duration={5} colorFrom="#06B6D4" colorTo="#3B82F6" />
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-mono font-bold text-cyan-300">TrustFed Federated Global</span>
+                <span className="text-xs font-mono font-bold text-cyan-300">OLYMPUS Federated Global</span>
                 <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-950 text-cyan-300 border border-cyan-800">
                   SecAgg + DP (v10)
                 </span>

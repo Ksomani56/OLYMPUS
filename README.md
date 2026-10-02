@@ -1,4 +1,4 @@
-# 🛡️ TrustFed — Privacy-Preserving Federated Fraud Intelligence Architecture
+# 🛡️ OLYMPUS — Privacy-Preserving Federated Fraud Intelligence Architecture
 
 > **"Institutions collaborate on intelligence, never on customer records."**  
 > *Built for the ENIGMA Hackathon.*
@@ -30,7 +30,7 @@
 Modern financial crime syndicates exploit the boundaries between banks, digital wallets, credit lenders, and insurance carriers:
 - **The Dilemma:** Financial institutions cannot pool raw customer records due to strict cross-border privacy laws (GDPR, DPDP, GLBA) and commercial confidentiality.
 - **The Failure:** Isolated institutions make blind decisions on fragmented signals, leading to high false-negative fraud rates and friction for legitimate customers.
-- **The TrustFed Breakthrough:** TrustFed is a multi-sector federated intelligence network. Models train locally behind private institutional firewalls. Cryptographic secret sharing (**SecAgg+**) and mathematical noise (**Rényi Differential Privacy**, $\epsilon=2.45$) ensure **zero raw customer records ever leave institutional custody**, while unlocking a **+104% to +185% lift in Precision-Recall AUC**.
+- **The OLYMPUS Breakthrough:** OLYMPUS is a multi-sector federated intelligence network. Models train locally behind private institutional firewalls. Cryptographic secret sharing (**SecAgg+**) and mathematical noise (**Rényi Differential Privacy**, $\epsilon=2.45$) ensure **zero raw customer records ever leave institutional custody**, while unlocking a **+104% to +185% lift in Precision-Recall AUC**.
 
 ---
 
@@ -40,7 +40,7 @@ Modern financial crime syndicates exploit the boundaries between banks, digital 
 
 In enterprise financial operations, **a raw probability output (e.g. `0.8421`) is legally and operationally insufficient**. Under regulatory frameworks such as **NIST AI RMF**, **NIST SP 1270 (Explainable AI)**, **FCRA (Fair Credit Reporting Act)**, and **EU AI Act Title III**, automated adverse actions (account freezes, credit denials, or insurance audits) require **human-defensible explanations and actionable audit trails**.
 
-To solve this, **TrustFed integrates a production Large Language Model (LLM) reasoning layer powered by Google Gemini (Gemini 2.5 Flash)**.
+To solve this, **OLYMPUS integrates a production Large Language Model (LLM) reasoning layer powered by Google Gemini (Gemini 2.5 Flash)**.
 
 ```
 ┌─────────────────────────┐     ┌─────────────────────────┐     ┌─────────────────────────┐
@@ -59,7 +59,7 @@ To solve this, **TrustFed integrates a production Large Language Model (LLM) rea
                                                                 └─────────────────────────┘
 ```
 
-### Key LLM Capabilities in TrustFed:
+### Key LLM Capabilities in OLYMPUS:
 1. **Contextual Translation of SHAP Drivers:**  
    Translates high-dimensional mathematical SHAP log-odds impacts (e.g. `EXT_SOURCE_1: +0.982`, `claim_amount: -0.322`) into clear, actionable financial explanations for frontline fraud investigators.
 2. **Multi-Model Cascade with Zero Token Waste:**  
@@ -73,7 +73,7 @@ To solve this, **TrustFed integrates a production Large Language Model (LLM) rea
 
 ```
 ┌─────────────────────────────────┐               ┌─────────────────────────────────┐
-│       TRADITIONAL SILOED MODEL  │               │       TRUSTFED FEDERATED MODEL  │
+│       TRADITIONAL SILOED MODEL  │               │       OLYMPUS FEDERATED MODEL   │
 ├─────────────────────────────────┤               ├─────────────────────────────────┤
 │ • Sees only internal events     │               │ • Learns cross-institutional    │
 │ • Blind to multi-carrier attacks│               │   patterns anonymously         │
@@ -171,7 +171,7 @@ The platform provides an interactive sandbox for evaluating financial fraud risk
 ## 📂 Repository Structure
 
 ```
-TrustFed/
+OLYMPUS/
 ├── backend/                    # FastAPI Risk Engine & Machine Learning Pipelines
 │   ├── artifacts/              # Serialized ML models (GBDT, XGBoost, client silos)
 │   ├── risk_api.py             # Primary entry point
@@ -198,8 +198,8 @@ TrustFed/
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/Sahityasahani1/TrustFed.git
-cd TrustFed
+git clone https://github.com/Ksomani56/OLYMPUS.git
+cd OLYMPUS
 ```
 
 ### 2. Configure Environment Variables
@@ -245,11 +245,11 @@ Open **`http://localhost:5173`** in your browser.
 2. **Minute 2: The Privacy Shield (Tabs 1, 2, 3)**  
    Demonstrate the live telemetry pill bar: **Raw Records: 0**, **SecAgg+: 3/3**, **DP: $\epsilon=2.45$**. Explain how local gradients are masked cryptographically before federation.
 3. **Minute 3: The Payoff (Model Showdown & LLM Audit)**  
-   Click any high-risk preset in Tab 1, 2, or 3, then click **Calculate & Screen**. Watch the **TrustFed Global Consensus Model** catch the attack with high confidence, while the **Google Gemini LLM layer** instantly renders a plain-English, regulatory-compliant audit brief with SHAP driver attributions.
+   Click any high-risk preset in Tab 1, 2, or 3, then click **Calculate & Screen**. Watch the **OLYMPUS Global Consensus Model** catch the attack with high confidence, while the **Google Gemini LLM layer** instantly renders a plain-English, regulatory-compliant audit brief with SHAP driver attributions.
 
 ---
 
 <div align="center">
-  <b>TrustFed • Privacy-Preserving Federated Fraud Intelligence</b><br/>
+  <b>OLYMPUS • Privacy-Preserving Federated Fraud Intelligence</b><br/>
   <i>Developed for the ENIGMA Hackathon.</i>
 </div>

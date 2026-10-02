@@ -1,4 +1,4 @@
-# 🖥️ TrustFed Frontend — Interactive Financial Fraud Screening Platform
+# 🖥️ OLYMPUS Frontend — Interactive Financial Fraud Screening Platform
 
 React 19 + TypeScript + Vite web platform delivering real-time federated risk assessments, interactive transaction sandboxes, and explainable AI insights.
 

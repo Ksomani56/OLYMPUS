@@ -203,7 +203,7 @@ export const IntelligenceAndGovView: React.FC<IntelligenceAndGovViewProps> = ({
       certificateId: 'NIST-SP1270-TF-9824',
       framework: 'NIST SP 1270 & EU AI Act Art. 14 Trustworthy AI',
       evaluatedTransaction: evaluatedTx,
-      modelArchitecture: 'TrustFed Federated Global GBDT v10.4',
+      modelArchitecture: 'OLYMPUS Federated Global GBDT v10.4',
       consensusQuorum: '3/3 Silo Nodes (Apex Bank, Regis Bank, FlashPay)',
       secAggMaskHash: '0x8f2a93c7...e14d',
       differentialPrivacy: { epsilon: 2.45, delta: 1e-5 },
@@ -1326,7 +1326,7 @@ export const IntelligenceAndGovView: React.FC<IntelligenceAndGovViewProps> = ({
                     </div>
                   </TiltedCard>
 
-                  {/* TrustFed Global Federated Model */}
+                  {/* OLYMPUS Global Federated Model */}
                   <TiltedCard 
                     maxTilt={8} 
                     className="p-6 border-2 border-emerald-400 bg-gradient-to-b from-white to-emerald-50/40 shadow-2xl shadow-emerald-500/20"
@@ -1334,7 +1334,7 @@ export const IntelligenceAndGovView: React.FC<IntelligenceAndGovViewProps> = ({
                   >
                     <BorderBeam duration={5} colorFrom="#0284C7" colorTo="#10B981" />
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-mono font-bold text-emerald-900">TrustFed Federated Global</span>
+                      <span className="text-xs font-mono font-bold text-emerald-900">OLYMPUS Federated Global</span>
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold flex items-center gap-1">
                         <Zap className="w-2.5 h-2.5 text-emerald-600" />
                         <span>{backendStatus === 'connected' ? 'risks_api + Gemini' : 'SecAgg + DP v10'}</span>

@@ -780,11 +780,11 @@ export const InsuranceClaimsView: React.FC<InsuranceClaimsViewProps> = ({
                     </div>
                   </TiltedCard>
 
-                  {/* TrustFed Federated Global Model */}
+                  {/* OLYMPUS Federated Global Model */}
                   <TiltedCard maxTilt={8} className="p-6 border-2 border-emerald-400 bg-gradient-to-b from-white to-emerald-50/40 shadow-2xl">
                     <BorderBeam duration={5} colorFrom="#0284C7" colorTo="#10B981" />
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-mono font-bold text-emerald-900">TrustFed Federated Global</span>
+                      <span className="text-xs font-mono font-bold text-emerald-900">OLYMPUS Federated Global</span>
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold">
                         {backendStatus === 'connected' ? 'insurance + Gemini' : 'SecAgg + DP'}
                       </span>

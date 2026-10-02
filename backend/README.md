@@ -1,4 +1,4 @@
-# ⚙️ TrustFed Backend — Risk Inference & Explainability Engine
+# ⚙️ OLYMPUS Backend — Risk Inference & Explainability Engine
 
 High-performance FastAPI service providing federated machine learning risk assessments, SHAP driver attributions, and Google Gemini LLM audit brief explanations for financial fraud detection.
 
