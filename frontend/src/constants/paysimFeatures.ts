@@ -22,7 +22,7 @@ export const PAYSIM_FEATURE_DICTIONARY: PaySimFeatureDef[] = [
     description: 'The category of transaction being performed. Select the type that best describes the transaction.',
     meaning: 'Transaction category',
     uiControl: 'One of CASH_IN, CASH_OUT, DEBIT, PAYMENT, TRANSFER',
-    icon: '🔀',
+    icon: '',
   },
   {
     input: 'amount',
@@ -30,7 +30,7 @@ export const PAYSIM_FEATURE_DICTIONARY: PaySimFeatureDef[] = [
     description: 'The amount of money involved in this transaction. The model compares this amount with the account balances to identify unusual transaction patterns.',
     meaning: 'Transaction amount',
     uiControl: 'Nonnegative number ($ currency)',
-    icon: '💵',
+    icon: '',
   },
   {
     input: 'oldbalanceOrg',
@@ -38,7 +38,7 @@ export const PAYSIM_FEATURE_DICTIONARY: PaySimFeatureDef[] = [
     description: "The amount available in the sender's account immediately before this transaction. This helps the model assess how large the transaction is relative to the sender's available balance.",
     meaning: "Sender's balance before the transaction",
     uiControl: 'Nonnegative number ($ currency)',
-    icon: '🏦',
+    icon: '',
   },
   {
     input: 'oldbalanceDest',
@@ -46,6 +46,6 @@ export const PAYSIM_FEATURE_DICTIONARY: PaySimFeatureDef[] = [
     description: "The amount available in the receiver's account immediately before this transaction. This helps the model understand the transaction in relation to the receiver's existing balance.",
     meaning: "Receiver's balance before the transaction",
     uiControl: 'Nonnegative number ($ currency)',
-    icon: '🎯',
+    icon: '',
   },
 ];

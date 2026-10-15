@@ -16,13 +16,14 @@ if str(backend_dir) not in sys.path:
 from federation.data import create_bank_partitions, get_partition_profiles, FEATURE_COLUMNS
 from federation.client import FederationClient
 from federation.coordinator import FederationCoordinator
+from federation.gateway import GatewayDecision
 
 
 def run_federation_simulation(num_rounds: int = 3, seed: int = 42, verbose: bool = True) -> dict:
     """Run deterministic multi-round federation experiment."""
     if verbose:
         print("=" * 70)
-        print(" OLYMPUS FEDERATION BASELINE SIMULATION (STAGE 1)")
+        print(" OLYMPUS FEDERATION BASELINE SIMULATION (STAGE 1 & 3)")
         print("=" * 70)
 
     # 1. Generate non-IID partitions
@@ -44,7 +45,7 @@ def run_federation_simulation(num_rounds: int = 3, seed: int = 42, verbose: bool
     }
     X_val, y_val = partitions["val"]
 
-    # 3. Instantiate Coordinator
+    # 3. Instantiate Coordinator (with integrated Security Gateway)
     coordinator = FederationCoordinator(num_features=len(FEATURE_COLUMNS), seed=seed)
 
     # Round 0 Baseline evaluation (prior to any federated rounds)
@@ -58,13 +59,13 @@ def run_federation_simulation(num_rounds: int = 3, seed: int = 42, verbose: bool
 
     rounds_records = [r0_eval]
 
-    # 4. Execute Federation Rounds
+    # 4. Execute Federation Rounds through Security Gateway
     for r in range(1, num_rounds + 1):
         if verbose:
             print(f"\n>>> Starting Federation Round {r} <<<")
 
         global_w, global_b = coordinator.get_global_parameters()
-        round_updates = []
+        validated_updates = []
 
         # Each client trains independently on private partition
         for cid, client in clients.items():
@@ -73,23 +74,41 @@ def run_federation_simulation(num_rounds: int = 3, seed: int = 42, verbose: bool
             update = client.local_train(
                 global_weights=global_w,
                 global_bias=global_b,
+                round_id=r,
                 epochs=5,
                 lr=0.08,
                 batch_size=64,
                 seed=client_seed,
             )
-            round_updates.append(update)
-            if verbose:
-                print(f"  [{cid}] Local Train: Loss={update['local_loss']:.4f}, PR-AUC={update['local_pr_auc']:.4f}, Delta Norm={update['delta_norm']:.4f}")
+            # Mandatory Security Gateway Inspection & Trust Evaluation
+            gateway_res = coordinator.receive_update(update)
+            client_trust = coordinator.get_client_trust(cid)
+            if gateway_res.decision == GatewayDecision.ACCEPT:
+                validated_updates.append(gateway_res)
+                if verbose:
+                    print(
+                        f"  [{cid}] Gateway ACCEPT | Trust: {client_trust:.1f} | Hash: {gateway_res.update_hash[:10]}... | "
+                        f"L2 Norm: {gateway_res.telemetry['l2_norm']:.4f} | Local Loss: {update['local_loss']:.4f}"
+                    )
+            else:
+                if verbose:
+                    print(f"  [{cid}] Gateway REJECT (Trust: {client_trust:.1f}): {gateway_res.reason}")
 
         # Coordinator aggregates updates via FedAvg
-        agg_meta = coordinator.aggregate_fedavg(round_updates)
+        agg_meta = coordinator.aggregate_fedavg(validated_updates)
         eval_meta = coordinator.evaluate(X_val, y_val)
         eval_meta["aggregated_dw_norm"] = agg_meta["aggregated_dw_norm"]
         rounds_records.append(eval_meta)
 
         if verbose:
             print(f"  [FedAvg Aggregation] Participants: {len(agg_meta['participating_clients'])}, Total Samples: {agg_meta['total_samples']}, Delta Norm: {agg_meta['aggregated_dw_norm']:.4f}")
+            if "anomaly_results" in agg_meta:
+                for cid, a_res in agg_meta["anomaly_results"].items():
+                    print(
+                        f"  [{cid}] Stage 5 Telemetry: Status={a_res['status']} | "
+                        f"Cosine Sim={a_res['cosine_similarity']:.4f} | "
+                        f"Norm Ratio={a_res['norm_ratio']:.4f} | Peers={a_res['peer_count']}"
+                    )
             print(f"  [Global Eval Round {r}] Loss: {eval_meta['val_loss']:.4f}, PR-AUC: {eval_meta['val_pr_auc']:.4f}, Acc: {eval_meta['val_accuracy']:.4f}")
 
     # 5. Analyze empirical trajectory
@@ -105,6 +124,8 @@ def run_federation_simulation(num_rounds: int = 3, seed: int = 42, verbose: bool
         trajectory = "remains stable"
     else:
         trajectory = "fluctuates"
+
+    final_trust_records = coordinator.get_all_trust_records()
 
     if verbose:
         print("\n" + "=" * 70)
@@ -122,6 +143,19 @@ def run_federation_simulation(num_rounds: int = 3, seed: int = 42, verbose: bool
         print(f"Initial (R0) -> Final (R{num_rounds}):")
         print(f"  Loss:   {val_losses[0]:.4f} -> {val_losses[-1]:.4f} (delta: {loss_change:+.4f})")
         print(f"  PR-AUC: {val_praucs[0]:.4f} -> {val_praucs[-1]:.4f} (delta: {prauc_change:+.4f})")
+
+        print("\n--- Participant Dynamic Trust Standing (Stage 4) ---")
+        print(f"{'Client ID':<12} | {'Trust Score':<12} | {'Status':<10} | {'Accepted':<10} | {'Rejected':<10}")
+        print("-" * 62)
+        for cid, trec in final_trust_records.items():
+            print(f"{cid:<12} | {trec.trust_score:<12.1f} | {trec.status.value:<10} | {trec.accepted_updates:<10} | {trec.rejected_updates:<10}")
+
+        print("\n--- Stage 5 Anomaly & Telemetry Engine (Round 3 Observation) ---")
+        print(f"{'Client ID':<12} | {'Detection':<14} | {'Cosine Sim':<12} | {'Norm Ratio':<12} | {'Peers':<6}")
+        print("-" * 62)
+        if "anomaly_results" in agg_meta:
+            for cid, a_res in agg_meta["anomaly_results"].items():
+                print(f"{cid:<12} | {a_res['status']:<14} | {a_res['cosine_similarity']:<12.4f} | {a_res['norm_ratio']:<12.4f} | {a_res['peer_count']:<6}")
         print("=" * 70)
 
     return {
@@ -130,6 +164,8 @@ def run_federation_simulation(num_rounds: int = 3, seed: int = 42, verbose: bool
         "empirical_trajectory": trajectory,
         "loss_change": loss_change,
         "prauc_change": prauc_change,
+        "final_trust": {cid: trec.to_dict() for cid, trec in final_trust_records.items()},
+        "final_anomalies": agg_meta.get("anomaly_results", {}),
     }
 
 

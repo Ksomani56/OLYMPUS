@@ -36,6 +36,7 @@ class FederationClient:
         self,
         global_weights: np.ndarray,
         global_bias: float,
+        round_id: int = 1,
         epochs: int = 5,
         lr: float = 0.05,
         batch_size: int = 64,
@@ -92,6 +93,7 @@ class FederationClient:
 
         return {
             "client_id": self.client_id,
+            "round_id": int(round_id),
             "sample_count": self.num_samples,
             "delta_weights": delta_w,
             "delta_bias": delta_b,

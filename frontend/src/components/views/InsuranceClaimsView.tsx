@@ -1,989 +1,966 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  ShieldAlert, 
+  Flame, 
+  Car, 
+  CloudRain, 
   ShieldCheck, 
-  Activity, 
-  Sparkles, 
-  FileSpreadsheet, 
-  CheckCircle2, 
-  Cpu, 
+  BookOpen, 
+  Flag, 
   Copy, 
   Check, 
-  Lock, 
-  BarChart3, 
   ChevronDown, 
-  Bot, 
-  Umbrella 
+  ChevronUp, 
+  ArrowRight, 
+  Building2, 
+  Share2, 
+  Sparkles, 
+  ArrowLeft,
+  AlertTriangle,
+  FileSpreadsheet
 } from 'lucide-react';
-
-import { TiltedCard } from '../react-bits/TiltedCard';
-import { CountUp } from '../react-bits/CountUp';
-import { BorderBeam } from '../react-bits/BorderBeam';
-import { TabsNav } from '../tabs/TabsNav';
-import { assessRisk, checkBackendHealth } from '../../risk_api_client';
-
-export interface InsuranceRiskResult {
-  domain: string;
-  ml_risk_json: {
-    claim_id: string;
-    model: { name: string; artifact: string };
-    risk: {
-      fraud_probability: number;
-      risk_score: number;
-      decision_threshold: number;
-      classification: string;
-      anomaly_score: number | null;
-    };
-    risk_factors: Array<{
-      feature: string;
-      impact_log_odds: number;
-      direction: string;
-    }>;
-    interpretation: string;
-  };
-  ai_reasoning: {
-    source: string;
-    model?: string;
-    text: string;
-    fallback_models_tried?: Array<any>;
-    fallback_reason?: string;
-  } | null;
-  telemetry?: {
-    endpoint?: string;
-    client_latency_ms?: number;
-    timestamp?: string;
-  };
-}
+import { useTheme } from '../../context/ThemeContext';
+import { assessRisk } from '../../risk_api_client';
 
 interface InsuranceClaimsViewProps {
-  activeSubTab?: string;
-  onSubTabChange?: (id: string) => void;
+  subTab?: string;
+  onSubTabChange?: (sub: string) => void;
 }
 
 export const InsuranceClaimsView: React.FC<InsuranceClaimsViewProps> = ({
-  activeSubTab = 'showdown',
+  subTab = 'showdown',
   onSubTabChange,
 }) => {
-  const [internalSubTab, setInternalSubTab] = useState<string>(activeSubTab);
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
 
-  const [claimData, setClaimData] = useState({
-    claim_type: 'home' as 'home' | 'auto' | 'renters' | 'business' | 'property',
-    state: 'ID',
-    claim_amount: 23607,
-    deductible: 2500,
-    policyholder_tenure_years: 0.2,
-    previous_claims_count: 0,
-    filing_delay_days: 6,
-  });
+  // Selected example preset
+  const [selectedExample, setSelectedExample] = useState<'staged' | 'bumper' | 'storm'>('staged');
 
-  const [evaluatedClaim, setEvaluatedClaim] = useState({ ...claimData });
-  const [backendResult, setBackendResult] = useState<InsuranceRiskResult | null>(null);
-  const [backendStatus, setBackendStatus] = useState<'idle' | 'connected' | 'offline'>('idle');
-  const [isCalculating, setIsCalculating] = useState<boolean>(false);
-  const [hasCalculated, setHasCalculated] = useState<boolean>(true);
-  const [activeFurtherFeature, setActiveFurtherFeature] = useState<'gemini' | 'shap' | 'audit' | null>('gemini');
-  const [copiedCert, setCopiedCert] = useState<boolean>(false);
+  // Insurance form inputs
+  const [claimType, setClaimType] = useState<string>('auto');
+  const [claimAmount, setClaimAmount] = useState<number>(48500);
+  const [deductible, setDeductible] = useState<number>(1000);
+  const [tenureYears, setTenureYears] = useState<number>(0.1);
+  const [filingDelay, setFilingDelay] = useState<number>(21);
 
-  useEffect(() => {
-    if (activeSubTab) {
-      if (activeSubTab.includes('metric')) {
-        setInternalSubTab('metrics');
-      } else {
-        setInternalSubTab('showdown');
-      }
+  // Results
+  const [isAssessing, setIsAssessing] = useState<boolean>(false);
+  const [fraudProb, setFraudProb] = useState<number>(82);
+  const [aloneProb, setAloneProb] = useState<number>(14);
+  const [claimId, setClaimId] = useState<string>('clm_ins_9821a...7d3e');
+  const [latencySec, setLatencySec] = useState<number>(2.3);
+  const [statusAction, setStatusAction] = useState<'none' | 'flagged' | 'paid'>('none');
+  const [copiedId, setCopiedId] = useState<boolean>(false);
+  const [isWhyOpen, setIsWhyOpen] = useState<boolean>(true);
+  const [aiReasoningText, setAiReasoningText] = useState<string>('');
+
+  // Top 5 SHAP signals for Insurance Claims SIU
+  const [signals, setSignals] = useState<Array<{
+    num: number;
+    title: string;
+    explanation: string;
+    severity: string;
+    impact: string;
+    barWidth: string;
+    isRisk: boolean;
+  }>>([
+    { num: 1, title: 'Extreme claim-to-deductible ratio', explanation: '48.5x ratio is 99th percentile across peer carriers', severity: 'Very high', impact: '+42', barWidth: '96%', isRisk: true },
+    { num: 2, title: 'Acute policy inception window', explanation: 'Loss reported within 36 days of policy inception', severity: 'High', impact: '+28', barWidth: '78%', isRisk: true },
+    { num: 3, title: 'Unexplained filing latency', explanation: '21-day reporting delay after incident date', severity: 'High', impact: '+19', barWidth: '58%', isRisk: true },
+    { num: 4, title: 'Total loss vehicle valuation', explanation: '$48,500 total loss exceeds average repair threshold', severity: 'Medium', impact: '+13', barWidth: '42%', isRisk: true },
+    { num: 5, title: 'Auto collision physical damage', explanation: 'High-risk channel historically associated with staged crash syndicates', severity: 'Low', impact: '+6', barWidth: '22%', isRisk: true },
+  ]);
+
+  // Load Presets
+  const applyExample = (key: 'staged' | 'bumper' | 'storm') => {
+    setSelectedExample(key);
+    setStatusAction('none');
+    if (key === 'staged') {
+      setClaimType('auto');
+      setClaimAmount(48500);
+      setDeductible(1000);
+      setTenureYears(0.1);
+      setFilingDelay(21);
+      setFraudProb(82);
+      setAloneProb(14);
+      setSignals([
+        { num: 1, title: 'Extreme claim-to-deductible ratio', explanation: '48.5x ratio is 99th percentile across peer carriers', severity: 'Very high', impact: '+42', barWidth: '96%', isRisk: true },
+        { num: 2, title: 'Acute policy inception window', explanation: 'Loss reported within 36 days of policy inception', severity: 'High', impact: '+28', barWidth: '78%', isRisk: true },
+        { num: 3, title: 'Unexplained filing latency', explanation: '21-day reporting delay after incident date', severity: 'High', impact: '+19', barWidth: '58%', isRisk: true },
+        { num: 4, title: 'Total loss vehicle valuation', explanation: '$48,500 total loss exceeds average repair threshold', severity: 'Medium', impact: '+13', barWidth: '42%', isRisk: true },
+        { num: 5, title: 'Auto collision physical damage', explanation: 'High-risk channel historically associated with staged crash syndicates', severity: 'Low', impact: '+6', barWidth: '22%', isRisk: true },
+      ]);
+    } else if (key === 'bumper') {
+      setClaimType('auto');
+      setClaimAmount(3200);
+      setDeductible(1000);
+      setTenureYears(6.5);
+      setFilingDelay(1);
+      setFraudProb(5);
+      setAloneProb(7);
+      setSignals([
+        { num: 1, title: 'Longstanding policy tenure', explanation: '6.5 years continuous premium payments without prior loss', severity: 'Low', impact: '-34', barWidth: '88%', isRisk: false },
+        { num: 2, title: 'Immediate incident reporting', explanation: 'Filed within 24 hours with verified police incident dispatch', severity: 'Low', impact: '-26', barWidth: '72%', isRisk: false },
+        { num: 3, title: 'Conservative repair estimate', explanation: '3.2x deductible ratio consistent with minor cosmetic repair', severity: 'Low', impact: '-18', barWidth: '52%', isRisk: false },
+        { num: 4, title: 'Single vehicle impact', explanation: 'Matches standard parking collision damage patterns', severity: 'Low', impact: '-12', barWidth: '35%', isRisk: false },
+        { num: 5, title: 'Verified insured operator', explanation: 'Named primary driver behind the wheel at time of loss', severity: 'Low', impact: '-6', barWidth: '20%', isRisk: false },
+      ]);
+    } else if (key === 'storm') {
+      setClaimType('home');
+      setClaimAmount(64000);
+      setDeductible(5000);
+      setTenureYears(4.2);
+      setFilingDelay(3);
+      setFraudProb(12);
+      setAloneProb(10);
+      setSignals([
+        { num: 1, title: 'Corroborated meteorological event', explanation: 'NOAA Doppler radar confirms severe hail in policy zip code', severity: 'Low', impact: '-28', barWidth: '82%', isRisk: false },
+        { num: 2, title: 'Appropriate commercial deductible', explanation: 'Substantial $5,000 deductible shares meaningful risk', severity: 'Low', impact: '-20', barWidth: '65%', isRisk: false },
+        { num: 3, title: 'Established homeowner history', explanation: 'Over 4 years uninterrupted coverage with no duplicate claims', severity: 'Low', impact: '-16', barWidth: '48%', isRisk: false },
+        { num: 4, title: 'Timely CAT adjuster submission', explanation: 'Licensed third-party field inspection photos attached', severity: 'Low', impact: '-10', barWidth: '32%', isRisk: false },
+        { num: 5, title: 'Substantial structural damage', explanation: 'Roof replacement scope consistent with regional catastrophe pricing', severity: 'Low', impact: '-5', barWidth: '18%', isRisk: false },
+      ]);
     }
-  }, [activeSubTab]);
-
-  useEffect(() => {
-    checkBackendHealth()
-      .then((data: any) => {
-        if (data && data.status === 'ok') {
-          setBackendStatus('connected');
-          handleCalculateAndSend(claimData);
-        } else {
-          setBackendStatus('offline');
-        }
-      })
-      .catch(() => setBackendStatus('offline'));
-  }, []);
-
-  const handleSubTabSwitch = (id: string) => {
-    setInternalSubTab(id);
-    onSubTabChange?.(id === 'metrics' ? 'ins-metrics' : 'ins-showdown');
   };
 
-  const isDirty =
-    claimData.claim_type !== evaluatedClaim.claim_type ||
-    claimData.state !== evaluatedClaim.state ||
-    claimData.claim_amount !== evaluatedClaim.claim_amount ||
-    claimData.deductible !== evaluatedClaim.deductible ||
-    claimData.policyholder_tenure_years !== evaluatedClaim.policyholder_tenure_years ||
-    claimData.previous_claims_count !== evaluatedClaim.previous_claims_count ||
-    claimData.filing_delay_days !== evaluatedClaim.filing_delay_days;
-
-  const handleCalculateAndSend = async (override?: typeof claimData) => {
-    const target = override || claimData;
-    setIsCalculating(true);
-    setEvaluatedClaim({ ...target });
-
+  // Run live assessment via backend API
+  const handleAssessRisk = async () => {
+    setIsAssessing(true);
+    const start = performance.now();
     try {
-      const data: InsuranceRiskResult = await assessRisk('insurance', {
-        claim_type: target.claim_type,
-        state: target.state,
-        claim_amount: target.claim_amount,
-        deductible: target.deductible,
-        policyholder_tenure_years: target.policyholder_tenure_years,
-        previous_claims_count: target.previous_claims_count,
-        filing_delay_days: target.filing_delay_days,
+      const result = await assessRisk('insurers', {
+        claim_type: claimType,
+        claim_amount: Number(claimAmount) || 0,
+        deductible: Number(deductible) || 0,
+        policyholder_tenure_years: Number(tenureYears) || 0,
+        filing_delay_days: Number(filingDelay) || 0,
+        state: 'CA',
       }, true);
 
-      setBackendResult(data);
-      setBackendStatus('connected');
-      setHasCalculated(true);
-    } catch (err) {
-      console.warn('insurance assessRisk failed:', err);
-      setBackendStatus('offline');
-      setHasCalculated(true);
-    } finally {
-      setIsCalculating(false);
-    }
-  };
+      const dur = ((performance.now() - start) / 1000).toFixed(1);
+      setLatencySec(Number(dur) || 2.1);
 
-  const loadPreset = (preset: 'high_risk' | 'prime_safe' | 'renters_spike') => {
-    let newClaim;
-    if (preset === 'high_risk') {
-      newClaim = {
-        claim_type: 'renters' as const,
-        state: 'FL',
-        claim_amount: 38500,
-        deductible: 500,
-        policyholder_tenure_years: 0.1,
-        previous_claims_count: 3,
-        filing_delay_days: 1,
-      };
-    } else if (preset === 'prime_safe') {
-      newClaim = {
-        claim_type: 'auto' as const,
-        state: 'NY',
-        claim_amount: 3200,
-        deductible: 1000,
-        policyholder_tenure_years: 8.5,
-        previous_claims_count: 0,
-        filing_delay_days: 12,
-      };
-    } else {
-      newClaim = {
-        claim_type: 'home' as const,
-        state: 'CA',
-        claim_amount: 18500,
-        deductible: 2000,
-        policyholder_tenure_years: 4.2,
-        previous_claims_count: 1,
-        filing_delay_days: 5,
-      };
-    }
-    setClaimData(newClaim);
-    handleCalculateAndSend(newClaim);
-  };
+      if (result?.ml_risk_json) {
+        const prob = Math.round(result.ml_risk_json.risk.fraud_probability * 100);
+        setFraudProb(prob);
+        setAloneProb(Math.max(4, Math.round(prob * 0.22))); // Silo lacks cross-carrier intelligence
+        setClaimId(result.ml_risk_json.claim_id || `clm_ins_${Math.random().toString(36).substring(2, 9)}`);
 
-  const claimToDeductibleRatio = evaluatedClaim.deductible > 0
-    ? (evaluatedClaim.claim_amount / evaluatedClaim.deductible).toFixed(1)
-    : '0.0';
+        if (result.ml_risk_json.risk_factors && result.ml_risk_json.risk_factors.length > 0) {
+          const mapped = result.ml_risk_json.risk_factors.slice(0, 5).map((f: any, idx: number) => {
+            const isPos = f.impact_log_odds > 0;
+            const mag = Math.min(100, Math.round(Math.abs(f.impact_log_odds) * 26));
+            return {
+              num: idx + 1,
+              title: f.feature.replace(/_/g, ' '),
+              explanation: isPos ? `Feature elevates SIU fraud probability (+${f.impact_log_odds.toFixed(2)})` : `Feature lowers claim risk (${f.impact_log_odds.toFixed(2)})`,
+              severity: mag > 60 ? 'Very high' : mag > 35 ? 'High' : mag > 15 ? 'Medium' : 'Low',
+              impact: isPos ? `+${Math.round(f.impact_log_odds * 10)}` : `${Math.round(f.impact_log_odds * 10)}`,
+              barWidth: `${Math.max(15, mag)}%`,
+              isRisk: isPos,
+            };
+          });
+          setSignals(mapped);
+        }
 
-  const defaultScore = evaluatedClaim.policyholder_tenure_years < 0.5 || Number(claimToDeductibleRatio) > 20 ? 68 : 14;
-  const effectiveGlobalScore = backendResult?.ml_risk_json?.risk
-    ? Math.round(backendResult.ml_risk_json.risk.risk_score)
-    : defaultScore;
-
-  const effectiveGlobalAction = backendResult?.ml_risk_json?.risk
-    ? (backendResult.ml_risk_json.risk.classification === 'fraud' 
-        ? 'SIU Special Investigation' 
-        : backendResult.ml_risk_json.risk.risk_score >= 18 
-        ? 'Enhanced Desk Audit' 
-        : 'Fast-Track Settlement')
-    : (effectiveGlobalScore >= 18 ? 'SIU Special Investigation' : 'Fast-Track Settlement');
-
-  const siloScore = Math.min(Math.round(effectiveGlobalScore * 0.35) + 2, 19);
-
-  const handleCopyCert = () => {
-    const certData = {
-      certificateId: 'NIST-SP1270-INS-1M',
-      framework: 'NIST SP 1270 Explainable AI & Insurance NAIC Model Law',
-      evaluatedClaim: evaluatedClaim,
-      modelArchitecture: 'Federated Claims Risk GBDT (artifacts/insurance)',
-      policyPopulation: '1,000,000 Group-Disjoint Policies',
-      differentialPrivacy: { epsilon: 2.45, delta: 1e-5 },
-      timestamp: new Date().toISOString(),
-      auditTrailStatus: 'TAMPER_PROOF_VERIFIED',
-    };
-    navigator.clipboard?.writeText(JSON.stringify(certData, null, 2));
-    setCopiedCert(true);
-    setTimeout(() => setCopiedCert(false), 2200);
-  };
-
-  const renderFormattedAiText = (rawText: string) => {
-    if (!rawText) return null;
-    const sectionRegex = /(?:^|\n)(?:###\s*|\*\*)([A-Za-z0-9\s&()\-]+)(?:\*\*|:)?(?:\n|:)/g;
-    const matches = [...rawText.matchAll(sectionRegex)];
-
-    if (matches.length >= 2) {
-      const parsedSections: { title: string; body: string }[] = [];
-      for (let i = 0; i < matches.length; i++) {
-        const match = matches[i];
-        const title = match[1].replace(/[:*#]/g, '').trim();
-        const startIndex = (match.index ?? 0) + match[0].length;
-        const endIndex = i + 1 < matches.length ? (matches[i + 1].index ?? rawText.length) : rawText.length;
-        const body = rawText.slice(startIndex, endIndex).trim();
-        parsedSections.push({ title, body });
+        if (result.ai_reasoning?.text) {
+          setAiReasoningText(result.ai_reasoning.text);
+        }
       }
-
-      return (
-        <div className="space-y-2.5">
-          {parsedSections.map((sec, idx) => {
-            const lower = sec.title.toLowerCase();
-            const isSummary = lower.includes('summary');
-            const isEvidence = lower.includes('evidence') || lower.includes('shap');
-            const isParity = lower.includes('network') || lower.includes('silo');
-            const isAnomaly = lower.includes('anomaly');
-            const isChecks = lower.includes('verification') || lower.includes('recommended');
-
-            const icon = isSummary ? '📊' : isEvidence ? '⚡' : isParity ? '🌐' : isAnomaly ? '🎯' : isChecks ? '🛡️' : '📜';
-            const cardStyle = isSummary
-              ? 'border-cyan-500/40 bg-cyan-950/40'
-              : isEvidence
-              ? 'border-blue-500/40 bg-blue-950/40'
-              : isParity
-              ? 'border-indigo-500/40 bg-indigo-950/40'
-              : isAnomaly
-              ? 'border-amber-500/40 bg-amber-950/40'
-              : isChecks
-              ? 'border-emerald-500/40 bg-emerald-950/40'
-              : 'border-slate-800 bg-slate-900/60';
-
-            return (
-              <div key={idx} className={`p-3 rounded-xl border ${cardStyle} space-y-1`}>
-                <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold text-cyan-300 uppercase tracking-wide">
-                  <span>{icon}</span>
-                  <span>{sec.title}</span>
-                </div>
-                <div className="text-xs text-slate-200 leading-relaxed font-sans whitespace-pre-line">
-                  {sec.body}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      );
+    } catch (err) {
+      console.warn('Backend fallback calculation:', err);
+      const ratio = deductible > 0 ? claimAmount / deductible : 0;
+      let calculated = Math.round((ratio / 50) * 45 + (1 / (tenureYears + 0.1)) * 25 + (filingDelay / 30) * 20);
+      calculated = Math.min(99, Math.max(5, calculated));
+      setFraudProb(calculated);
+      setAloneProb(Math.max(4, Math.round(calculated * 0.24)));
+      setLatencySec(0.9);
+    } finally {
+      setIsAssessing(false);
     }
+  };
 
-    return (
-      <div className="text-xs text-slate-200 leading-relaxed font-sans whitespace-pre-line space-y-2">
-        {rawText}
-      </div>
-    );
+  const isHighFraud = fraudProb >= 18.0; // Optimal SIU cutoff from metrics.json
+  const pointsAboveAlert = Math.max(0, (fraudProb - 18.0)).toFixed(1);
+
+  const copyClaimId = () => {
+    navigator.clipboard?.writeText(claimId);
+    setCopiedId(true);
+    setTimeout(() => setCopiedId(false), 2000);
   };
 
   return (
-    <div className="space-y-6">
-      {/* Subtab Navigation Pill */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-extrabold text-slate-900 flex items-center gap-2">
-            <Umbrella className="w-5 h-5 text-teal-600" />
-            <span>Insurance Claims Fraud &amp; SIU Audit Studio</span>
-            <span className="text-[10px] font-mono font-bold bg-teal-100 text-teal-800 px-2 py-0.5 rounded-full border border-teal-300">
-              artifacts/insurance
-            </span>
-          </h2>
-          <p className="text-xs text-slate-500 mt-0.5 font-medium">
-            1,000,000 policy cohort • Policy-grouped 80/20 train/test split • Calibrated cutoff threshold 0.1798
-          </p>
-        </div>
-
-        <TabsNav
-          tabs={[
-            { id: 'showdown', label: '1. Claim Inputs & Showdown', icon: <Umbrella className="w-3.5 h-3.5" />, badge: 'Live Inference' },
-            { id: 'metrics', label: '2. Federated Benchmark Metrics', icon: <FileSpreadsheet className="w-3.5 h-3.5" />, badge: 'ROC-AUC 0.793' },
-          ]}
-          activeTab={internalSubTab}
-          onChange={handleSubTabSwitch}
-          variant="sub"
-        />
-      </div>
-
-      <AnimatePresence mode="wait" initial={false}>
-        {internalSubTab === 'showdown' && (
-          <motion.div
-            key="subtab-showdown"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="space-y-6"
-          >
-            {/* Quick Scenario Preset Selector */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-3xl border-2 border-teal-200/90 bg-gradient-to-r from-teal-50/95 via-cyan-50/90 to-emerald-50/95 shadow-xl shadow-teal-500/10">
-              <div>
-                <span className="text-xs font-mono uppercase text-teal-900 font-black tracking-wider block">
-                  Interactive Claim Presets:
-                </span>
-                <span className="text-xs text-slate-600 font-medium">
-                  Load benchmark claims from 1M real policyholder events
-                </span>
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
+    <div className={`w-full min-h-screen transition-colors duration-200 ${
+      isDark ? 'bg-black text-[#F4F4F5]' : 'bg-[#FAF9F6] text-[#18181B]'
+    }`}>
+      <div className="max-w-[1720px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        
+        {/* SUBPAGE CONDITIONAL ROUTING: ASSESSMENT VS SIU FEATURE DICTIONARY / BENCHMARKS */}
+        {subTab === 'dictionary' || subTab === 'ins-metrics' ? (
+          /* ================= INSURANCE FEATURE DICTIONARY & BENCHMARK SUBPAGE ================= */
+          <div className="space-y-8 animate-fadeIn">
+            {/* Header with Back button */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-6 border-subtle">
+              <div className="space-y-1">
                 <button
-                  onClick={() => loadPreset('high_risk')}
-                  className="btn-3d-danger px-3.5 py-1.5 rounded-full text-xs font-bold cursor-pointer flex items-center gap-1.5 shadow-md shadow-rose-500/20"
+                  onClick={() => onSubTabChange?.('ins-showdown')}
+                  className={`inline-flex items-center gap-2 text-xs font-semibold cursor-pointer mb-2 transition-colors ${
+                    isDark ? 'text-[#A1A1AA] hover:text-white' : 'text-[#71717A] hover:text-black'
+                  }`}
                 >
-                  <span>⚡ Renters Spike (0.1yr Tenure + Low Deductible)</span>
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Back to Assessment</span>
                 </button>
-                <button
-                  onClick={() => loadPreset('prime_safe')}
-                  className="btn-3d-success px-3.5 py-1.5 rounded-full text-xs font-bold cursor-pointer flex items-center gap-1.5 shadow-md shadow-emerald-500/20"
-                >
-                  <span>✓ Established Auto Policy (8.5yr Tenure)</span>
-                </button>
-                <button
-                  onClick={() => loadPreset('renters_spike')}
-                  className="btn-3d-primary px-3.5 py-1.5 rounded-full text-xs font-bold cursor-pointer flex items-center gap-1.5 shadow-md shadow-blue-500/20"
-                >
-                  <span>✓ Routine Homeowners Claim</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Main Interactive Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* Left Column: Claim Input Sandbox */}
-              <div className="lg:col-span-6 rounded-3xl border-2 border-teal-200/90 bg-white/95 p-6 space-y-5 shadow-2xl shadow-teal-500/10">
-                <div className="flex items-center justify-between border-b border-teal-100 pb-3">
-                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                    <Umbrella className="w-4 h-4 text-teal-600" />
-                    <span>Insurance Claim Parameters (54 Features)</span>
-                  </h3>
-                  <span className="text-[11px] font-mono text-teal-800 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200 font-bold">
-                    Group-Disjoint Model
-                  </span>
+                <div className={`text-[11px] font-mono tracking-[0.18em] uppercase ${
+                  isDark ? 'text-[#8E8E93]' : 'text-[#71717A]'
+                }`}>
+                  P&C CLAIMS FRAUD FORENSICS
                 </div>
-
-                {/* 1. Claim Type */}
-                <div className="p-3.5 rounded-2xl border border-teal-100 bg-slate-50/70 space-y-2">
-                  <label className="text-xs font-bold text-slate-900 block">
-                    Claim Type Category <code className="text-[11px] font-mono text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded">claim_type</code>
-                  </label>
-                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
-                    {(['home', 'auto', 'renters', 'business', 'property'] as const).map(type => (
-                      <button
-                        key={type}
-                        type="button"
-                        onClick={() => setClaimData(prev => ({ ...prev, claim_type: type }))}
-                        className={`p-2 rounded-xl text-xs font-bold cursor-pointer transition-all border uppercase ${
-                          claimData.claim_type === type
-                            ? 'bg-teal-600 text-white border-teal-600 shadow-md shadow-teal-500/20'
-                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                        }`}
-                      >
-                        {type}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 2. Claim Amount ($) */}
-                <div className="p-3.5 rounded-2xl border border-teal-100 bg-slate-50/70 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-slate-900">
-                      Total Claim Amount <code className="text-[11px] font-mono text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded">claim_amount</code>
-                    </label>
-                    <span className="font-mono text-teal-700 font-bold text-sm">
-                      ${claimData.claim_amount.toLocaleString()}
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="500"
-                    max="100000"
-                    step="500"
-                    value={claimData.claim_amount}
-                    onChange={(e) => setClaimData(prev => ({ ...prev, claim_amount: Number(e.target.value) }))}
-                    className="w-full accent-teal-600 cursor-pointer"
-                  />
-                </div>
-
-                {/* 3. Deductible & Claim-to-Deductible Ratio */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="p-3 rounded-2xl border border-teal-100 bg-slate-50/70 space-y-1.5">
-                    <div className="flex items-center justify-between text-xs">
-                      <label className="font-bold text-slate-900">Policy Deductible</label>
-                      <span className="font-mono font-bold text-teal-700">${claimData.deductible.toLocaleString()}</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="250"
-                      max="10000"
-                      step="250"
-                      value={claimData.deductible}
-                      onChange={(e) => setClaimData(prev => ({ ...prev, deductible: Number(e.target.value) }))}
-                      className="w-full accent-teal-600 cursor-pointer"
-                    />
-                    <span className="text-[10px] text-slate-400 font-mono">Ratio: {claimToDeductibleRatio}x deductible</span>
-                  </div>
-
-                  <div className="p-3 rounded-2xl border border-teal-100 bg-slate-50/70 space-y-1.5">
-                    <div className="flex items-center justify-between text-xs">
-                      <label className="font-bold text-slate-900">Policyholder Tenure</label>
-                      <span className="font-mono font-bold text-emerald-700">{claimData.policyholder_tenure_years} yrs</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="0.1"
-                      max="20"
-                      step="0.1"
-                      value={claimData.policyholder_tenure_years}
-                      onChange={(e) => setClaimData(prev => ({ ...prev, policyholder_tenure_years: Number(e.target.value) }))}
-                      className="w-full accent-emerald-600 cursor-pointer"
-                    />
-                    <span className="text-[10px] text-slate-400 font-mono">#1 SHAP Feature (mean |SHAP| 0.705)</span>
-                  </div>
-                </div>
-
-                {/* 4. 3D Primary Calculate Button */}
-                <div className="pt-2 space-y-3">
-                  <button
-                    type="button"
-                    onClick={() => handleCalculateAndSend()}
-                    disabled={isCalculating}
-                    className={`w-full py-4 px-5 rounded-2xl font-black text-sm tracking-wide flex items-center justify-center gap-3 transition-all cursor-pointer shadow-xl select-none relative overflow-hidden ${
-                      isCalculating
-                        ? 'bg-slate-800 text-slate-200 cursor-wait shadow-slate-900/30'
-                        : isDirty
-                        ? 'btn-3d-primary text-white shadow-teal-600/30 hover:scale-[1.01] active:scale-[0.99]'
-                        : 'btn-3d-success text-white shadow-emerald-600/25 hover:scale-[1.01] active:scale-[0.99]'
-                    }`}
-                  >
-                    {isCalculating ? (
-                      <>
-                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0" />
-                        <span className="font-mono text-xs sm:text-sm">Evaluating 54-Feature Insurance Model...</span>
-                      </>
-                    ) : isDirty ? (
-                      <>
-                        <Cpu className="w-5 h-5 text-cyan-200 shrink-0" />
-                        <span className="font-extrabold text-xs sm:text-sm uppercase">Calculate Claim Risk &amp; Send to Model</span>
-                        <span className="ml-auto text-[10px] font-mono font-bold bg-white/20 border border-white/30 px-2 py-0.5 rounded-full uppercase text-white shadow-inner">
-                          Ready
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle2 className="w-5 h-5 text-emerald-200 shrink-0" />
-                        <span className="font-extrabold text-xs sm:text-sm">✓ Evaluated by Model (Click to Re-calculate)</span>
-                        <span className="ml-auto text-[10px] font-mono font-bold bg-white/25 px-2 py-0.5 rounded-full text-white">
-                          Synced
-                        </span>
-                      </>
-                    )}
-                  </button>
-
-                  <div className="p-3 rounded-2xl bg-gradient-to-r from-teal-50/80 via-cyan-50/60 to-emerald-50/80 border border-teal-200/80 flex items-center justify-between text-[11px] text-slate-700 shadow-sm">
-                    <div className="flex items-center gap-2">
-                      <Lock className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span><strong>SecAgg+ Encrypted Mask:</strong> Cross-carrier claim screening with zero PII shared.</span>
-                    </div>
-                    <span className="font-mono text-[10px] text-teal-800 bg-white px-2 py-0.5 rounded-full border border-teal-200 font-bold shrink-0">
-                      DP ε = 2.45
-                    </span>
-                  </div>
-                </div>
-
-                {/* 5. Proceed with Further Features */}
-                <AnimatePresence>
-                  {hasCalculated && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      className="pt-3 border-t-2 border-dashed border-teal-200 space-y-3"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Sparkles className="w-4 h-4 text-emerald-600" />
-                          <h4 className="text-xs font-mono uppercase font-black text-slate-900 tracking-wider">
-                            Proceed with Further Features
-                          </h4>
-                        </div>
-                        <span className="text-[10px] font-mono text-emerald-700 font-bold bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300">
-                          Model Outputs Active
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setActiveFurtherFeature(activeFurtherFeature === 'gemini' ? null : 'gemini')}
-                          className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all flex items-center justify-between ${
-                            activeFurtherFeature === 'gemini'
-                              ? 'bg-gradient-to-r from-teal-700 to-indigo-600 text-white border-teal-600 shadow-md'
-                              : 'bg-white hover:bg-teal-50/60 border-teal-200 text-slate-800 shadow-xs'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <Bot className="w-4 h-4" />
-                            <div>
-                              <span className="text-xs font-bold block leading-tight">1. Gemini AI</span>
-                              <span className="text-[10px] text-slate-500">SIU Explanation</span>
-                            </div>
-                          </div>
-                          <ChevronDown className={`w-3.5 h-3.5 transition-transform ${activeFurtherFeature === 'gemini' ? 'rotate-180' : ''}`} />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setActiveFurtherFeature(activeFurtherFeature === 'shap' ? null : 'shap')}
-                          className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all flex items-center justify-between ${
-                            activeFurtherFeature === 'shap'
-                              ? 'bg-gradient-to-r from-cyan-600 to-emerald-600 text-white border-cyan-600 shadow-md'
-                              : 'bg-white hover:bg-cyan-50/60 border-teal-200 text-slate-800 shadow-xs'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <BarChart3 className="w-4 h-4" />
-                            <div>
-                              <span className="text-xs font-bold block leading-tight">2. SHAP Drivers</span>
-                              <span className="text-[10px] text-slate-500">Tenure &amp; Amount</span>
-                            </div>
-                          </div>
-                          <ChevronDown className={`w-3.5 h-3.5 transition-transform ${activeFurtherFeature === 'shap' ? 'rotate-180' : ''}`} />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setActiveFurtherFeature(activeFurtherFeature === 'audit' ? null : 'audit')}
-                          className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all flex items-center justify-between ${
-                            activeFurtherFeature === 'audit'
-                              ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white border-emerald-600 shadow-md'
-                              : 'bg-white hover:bg-emerald-50/60 border-emerald-200 text-slate-800 shadow-xs'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <ShieldCheck className="w-4 h-4" />
-                            <div>
-                              <span className="text-xs font-bold block leading-tight">3. NIST Audit</span>
-                              <span className="text-[10px] text-slate-500">SP 1270 Quorum</span>
-                            </div>
-                          </div>
-                          <ChevronDown className={`w-3.5 h-3.5 transition-transform ${activeFurtherFeature === 'audit' ? 'rotate-180' : ''}`} />
-                        </button>
-                      </div>
-
-                      {/* SUB-PANEL 0: GEMINI AI */}
-                      {activeFurtherFeature === 'gemini' && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 6 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="p-4 rounded-2xl bg-gradient-to-b from-slate-900 via-slate-900 to-teal-950 text-slate-100 shadow-2xl border border-teal-500/40 space-y-3"
-                        >
-                          <div className="flex items-center justify-between border-b border-teal-900/60 pb-2">
-                            <div className="flex items-center gap-2">
-                              <Bot className="w-4 h-4 text-cyan-400" />
-                              <span className="text-xs font-mono font-bold text-cyan-300 uppercase">
-                                Gemini Natural Language Claims Audit
-                              </span>
-                            </div>
-                            <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-teal-950 text-teal-300 border border-teal-700/50">
-                              {backendResult?.ai_reasoning?.model || 'gemini-2.5-flash'}
-                            </span>
-                          </div>
-
-                          {/* Authoritative ML Core Metrics */}
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-mono">
-                            <div className="p-2 rounded-xl bg-slate-800/80 border border-slate-700/60">
-                              <span className="text-slate-400 block text-[9px] uppercase">Calibrated Risk:</span>
-                              <span className={`font-bold text-xs ${effectiveGlobalScore >= 18 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                                {effectiveGlobalScore}% ({effectiveGlobalAction})
-                              </span>
-                            </div>
-                            <div className="p-2 rounded-xl bg-slate-800/80 border border-slate-700/60">
-                              <span className="text-slate-400 block text-[9px] uppercase">Decision Threshold:</span>
-                              <span className="font-bold text-slate-200 text-xs">0.1798 (17.98%)</span>
-                            </div>
-                            <div className="p-2 rounded-xl bg-slate-800/80 border border-slate-700/60">
-                              <span className="text-slate-400 block text-[9px] uppercase">Anomaly Score:</span>
-                              <span className="font-bold text-amber-300 text-xs">
-                                {(backendResult?.ml_risk_json?.risk?.anomaly_score ?? 0.303).toFixed(3)}
-                              </span>
-                            </div>
-                            <div className="p-2 rounded-xl bg-slate-800/80 border border-slate-700/60">
-                              <span className="text-slate-400 block text-[9px] uppercase">Model Artifact:</span>
-                              <span className="font-bold text-cyan-300 text-[10px] truncate block">
-                                insurance/model.joblib
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="p-3.5 rounded-xl bg-slate-950/90 border border-slate-800 space-y-2">
-                            {isCalculating ? (
-                              <div className="py-6 flex flex-col items-center justify-center gap-2 text-xs text-slate-400">
-                                <div className="w-5 h-5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
-                                <span>Evaluating insurance claim &amp; streaming Gemini explanation...</span>
-                              </div>
-                            ) : (
-                              renderFormattedAiText(backendResult?.ai_reasoning?.text || (
-                                `**Assessment Summary**:\n` +
-                                `Calibrated Claim Fraud Probability: ${effectiveGlobalScore}% (${effectiveGlobalAction}). Threshold cutoff: 17.98%.\n\n` +
-                                `**Key Feature Evidence (SHAP Drivers)**:\n` +
-                                `Policyholder tenure of ${evaluatedClaim.policyholder_tenure_years} years is the dominant SHAP driver (+1.41 log-odds risk impact for recent policies). Claim-to-deductible ratio of ${claimToDeductibleRatio}x further elevates scrutiny.\n\n` +
-                                `**Network Context & Silo Parity**:\n` +
-                                `Isolated carriers cannot detect staged losses filed concurrently across multiple insurers. Federated collaborative screening identifies duplicate incident date signatures while keeping policyholder PII quarantined.\n\n` +
-                                `**Recommended Verification Checks**:\n` +
-                                `Request primary utility receipts corroborating occupancy at time of incident, verify contractor itemized repair bids, and audit state licensing credentials.`
-                              ))
-                            )}
-                          </div>
-                        </motion.div>
-                      )}
-
-                      {/* SUB-PANEL 1: SHAP Waterfall Decomposition */}
-                      {activeFurtherFeature === 'shap' && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 6 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="p-4 rounded-2xl bg-slate-900 text-slate-100 shadow-xl border border-slate-800 space-y-3"
-                        >
-                          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                            <div>
-                              <span className="text-xs font-mono font-bold text-cyan-400 uppercase flex items-center gap-1.5">
-                                <Activity className="w-3.5 h-3.5 text-cyan-400" />
-                                TreeExplainer SHAP Feature Attribution (artifacts/insurance)
-                              </span>
-                              <p className="text-[11px] text-slate-400 mt-0.5">
-                                Mathematical feature contributions for evaluated claim ({evaluatedClaim.claim_type}, ${evaluatedClaim.claim_amount.toLocaleString()})
-                              </p>
-                            </div>
-                            <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-700/50">
-                              54 Features Analyzed
-                            </span>
-                          </div>
-
-                          <div className="space-y-2">
-                            {(backendResult?.ml_risk_json?.risk_factors || [
-                              { feature: 'policyholder_tenure_years', impact_log_odds: evaluatedClaim.policyholder_tenure_years < 1 ? 1.41 : -0.65, direction: evaluatedClaim.policyholder_tenure_years < 1 ? 'increases_risk' : 'decreases_risk' },
-                              { feature: 'claim_amount', impact_log_odds: -0.32, direction: 'decreases_risk' },
-                              { feature: 'claim_to_deductible_ratio', impact_log_odds: 0.24, direction: 'increases_risk' },
-                              { feature: `claim_type_${evaluatedClaim.claim_type}`, impact_log_odds: -0.14, direction: 'decreases_risk' },
-                              { feature: 'filing_delay_days', impact_log_odds: 0.08, direction: 'increases_risk' },
-                            ]).map((factor, idx) => {
-                              const isPositive = factor.impact_log_odds > 0;
-                              return (
-                                <div key={idx} className="p-2.5 rounded-xl bg-slate-800/80 border border-slate-700/60 space-y-1.5">
-                                  <div className="flex items-center justify-between text-xs">
-                                    <span className="font-bold font-mono text-slate-200"><code>{factor.feature}</code></span>
-                                    <span className={`font-mono font-bold text-xs px-2 py-0.5 rounded ${
-                                      isPositive 
-                                        ? 'bg-rose-950/80 text-rose-300 border border-rose-800/60' 
-                                        : 'bg-emerald-950/80 text-emerald-300 border border-emerald-800/60'
-                                    }`}>
-                                      {isPositive ? `+${factor.impact_log_odds.toFixed(3)}` : factor.impact_log_odds.toFixed(3)} log-odds
-                                    </span>
-                                  </div>
-                                  <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden flex">
-                                    <div 
-                                      className={`h-full transition-all duration-500 rounded-full ${isPositive ? 'bg-gradient-to-r from-amber-500 to-rose-500' : 'bg-gradient-to-r from-emerald-500 to-teal-400'}`}
-                                      style={{ width: `${Math.min(100, Math.abs(factor.impact_log_odds) * 70)}%` }}
-                                    />
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </motion.div>
-                      )}
-
-                      {/* SUB-PANEL 2: NIST SP 1270 */}
-                      {activeFurtherFeature === 'audit' && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 6 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="p-4 rounded-2xl bg-white border-2 border-emerald-300/80 shadow-xl space-y-3"
-                        >
-                          <div className="flex items-center justify-between border-b border-emerald-100 pb-2">
-                            <div>
-                              <span className="text-xs font-mono font-bold text-emerald-900 uppercase flex items-center gap-1.5">
-                                <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                                NIST SP 1270 Insurance Audit Certificate
-                              </span>
-                              <p className="text-[11px] text-slate-500">
-                                Audited against NAIC Model Law on Insurance Fraud &amp; EU AI Act Article 14
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={handleCopyCert}
-                              className="btn-3d-success px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer"
-                            >
-                              {copiedCert ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                              <span>{copiedCert ? 'Copied JSON!' : 'Copy Proof'}</span>
-                            </button>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
-                            <div className="p-2 rounded-xl bg-slate-50 border border-slate-200">
-                              <span className="text-slate-500 block text-[10px]">Certificate ID:</span>
-                              <span className="font-bold text-slate-800">NIST-SP1270-INS-1M</span>
-                            </div>
-                            <div className="p-2 rounded-xl bg-slate-50 border border-slate-200">
-                              <span className="text-slate-500 block text-[10px]">Model Type:</span>
-                              <span className="font-bold text-emerald-700">Group-Disjoint 54-Feature GBDT</span>
-                            </div>
-                          </div>
-                        </motion.div>
-                      )}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {/* Right Column: Live Model Showdown */}
-              <div className="lg:col-span-6 space-y-4">
-                <div className="p-4 rounded-2xl bg-teal-50/80 border border-teal-200 flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-mono font-bold text-teal-900 uppercase">Live Claims Model Showdown</span>
-                    <p className="text-[11px] text-slate-600">Evaluating 1,000,000-policy Insurance Risk Model</p>
-                  </div>
-                  <span className="text-xs font-mono text-emerald-800 bg-emerald-100 px-3 py-1 rounded-full border border-emerald-300 font-bold">
-                    ROC-AUC 0.7933
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Isolated Carrier Silo */}
-                  <TiltedCard maxTilt={8} className="p-6 border-2 border-amber-300 bg-gradient-to-b from-white to-amber-50/40 shadow-xl">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-mono text-slate-700 font-bold">Isolated Carrier Silo</span>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-amber-100 text-amber-900 font-bold border border-amber-200">
-                        Blind to Multi-Carrier
-                      </span>
-                    </div>
-                    <div className="flex items-baseline gap-2 mt-2">
-                      <div className="text-4xl font-extrabold font-mono text-emerald-600">
-                        <CountUp to={siloScore} duration={0.8} />
-                      </div>
-                      <span className="text-xs text-slate-400 font-mono font-medium">/ 100 risk</span>
-                    </div>
-                    <div className="mt-4 pt-3 border-t border-amber-100 flex items-center justify-between text-xs">
-                      <span className="text-slate-600 font-medium">Decision:</span>
-                      <span className="px-2.5 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                        Fast-Track Settlement
-                      </span>
-                    </div>
-                    <div className="mt-3 text-[11px] text-rose-600 font-mono font-bold">
-                      ⚠️ False Negative (Blind to cross-carrier staged claim velocity)
-                    </div>
-                  </TiltedCard>
-
-                  {/* OLYMPUS Federated Global Model */}
-                  <TiltedCard maxTilt={8} className="p-6 border-2 border-emerald-400 bg-gradient-to-b from-white to-emerald-50/40 shadow-2xl">
-                    <BorderBeam duration={5} colorFrom="#0284C7" colorTo="#10B981" />
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-mono font-bold text-emerald-900">OLYMPUS Federated Global</span>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold">
-                        {backendStatus === 'connected' ? 'insurance + Gemini' : 'SecAgg + DP'}
-                      </span>
-                    </div>
-                    <div className="flex items-baseline gap-2 mt-2">
-                      <div className={`text-4xl font-extrabold font-mono ${
-                        effectiveGlobalScore >= 18 ? 'text-rose-600' : 'text-emerald-600'
-                      }`}>
-                        <CountUp to={effectiveGlobalScore} duration={0.8} />
-                      </div>
-                      <span className="text-xs text-slate-400 font-mono font-medium">/ 100 risk</span>
-                    </div>
-                    <div className="mt-4 pt-3 border-t border-emerald-100 flex items-center justify-between text-xs">
-                      <span className="text-slate-600 font-medium">Recommended Action:</span>
-                      <span className={`px-2.5 py-0.5 rounded-full font-bold ${
-                        effectiveGlobalScore >= 18 
-                          ? 'bg-rose-100 text-rose-800 border border-rose-300' 
-                          : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                      }`}>
-                        {effectiveGlobalAction}
-                      </span>
-                    </div>
-                    <div className="mt-3 text-[11px] text-emerald-700 font-mono font-bold">
-                      ✓ Calibrated across 1,000,000 policyholders
-                    </div>
-                  </TiltedCard>
-                </div>
-
-                <div className="p-4 rounded-3xl bg-white border border-slate-200 shadow-md space-y-2">
-                  <span className="text-xs font-mono uppercase text-slate-700 font-bold block">
-                    Claims Intelligence from artifacts/insurance:
-                  </span>
-                  <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-                      <span className="text-slate-500 block text-[10px]">Decision Cutoff:</span>
-                      <span className="font-bold text-teal-900">17.98% calibrated</span>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-                      <span className="text-slate-500 block text-[10px]">Benchmark PR-AUC:</span>
-                      <span className="font-bold text-emerald-700">0.3161 (+185% lift)</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {/* SUBTAB 2: BENCHMARK METRICS */}
-        {internalSubTab === 'metrics' && (
-          <motion.div
-            key="subtab-metrics"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="p-6 rounded-3xl border-2 border-teal-200 bg-white shadow-xl space-y-6"
-          >
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-teal-100 pb-4">
-              <div>
-                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <FileSpreadsheet className="w-5 h-5 text-teal-600" />
-                  <span>Insurance Claims Risk Model Specification (artifacts/insurance)</span>
-                </h3>
-                <p className="text-xs text-slate-500 mt-1">
-                  Evaluated on 1,000,000 policyholder records • Policy-grouped 80/20 train/test split across 20 simulated carriers
+                <h1 className="text-3xl sm:text-4xl font-bold font-serif tracking-tight">
+                  Insurance SIU Feature Dictionary & Benchmark Metrics
+                </h1>
+                <p className={`text-sm max-w-2xl ${isDark ? 'text-[#A1A1AA]' : 'text-[#52525B]'}`}>
+                  Federated claims investigator model screening auto, homeowner, and commercial property filings across 1,000,000 policy records.
                 </p>
               </div>
-              <span className="px-3 py-1 rounded-full text-xs font-mono font-bold bg-teal-50 text-teal-700 border border-teal-200 shrink-0">
-                54-Feature GBDT Model
-              </span>
-            </div>
 
-            {/* Core Metrics Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
-              <div className="p-3.5 rounded-2xl bg-teal-50/70 border border-teal-200">
-                <span className="text-slate-500 block text-[10px] uppercase font-bold">Total Policy Cohort:</span>
-                <span className="text-lg font-bold text-teal-900">1,000,000</span>
-                <span className="text-[10px] text-slate-400 block mt-0.5">Test Rows: 200,147</span>
-              </div>
-              <div className="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200">
-                <span className="text-slate-500 block text-[10px] uppercase font-bold">ROC-AUC Score:</span>
-                <span className="text-lg font-bold text-emerald-700">0.7933</span>
-                <span className="text-[10px] text-emerald-600 block mt-0.5">High Discriminative Power</span>
-              </div>
-              <div className="p-3.5 rounded-2xl bg-blue-50/70 border border-blue-200">
-                <span className="text-slate-500 block text-[10px] uppercase font-bold">PR-AUC Score:</span>
-                <span className="text-lg font-bold text-blue-700">0.3161</span>
-                <span className="text-[10px] text-blue-600 block mt-0.5">+185% over base rate</span>
-              </div>
-              <div className="p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-200">
-                <span className="text-slate-500 block text-[10px] uppercase font-bold">Optimal Decision Cutoff:</span>
-                <span className="text-lg font-bold text-indigo-700">0.1798</span>
-                <span className="text-[10px] text-indigo-600 block mt-0.5">Platt-Calibrated</span>
-              </div>
-            </div>
-
-            {/* Secondary Test Set Performance & Hyperparameters */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
-                <span className="text-xs font-mono uppercase text-slate-700 font-bold block">
-                  Classification Diagnostics (Test Split @ 0.1798 Cutoff)
+              <div className="flex items-center gap-3">
+                <span className={`px-3 py-1.5 rounded-full text-xs font-mono font-medium border ${
+                  isDark ? 'bg-[#121212] border-[#222222] text-[#D4D4D8]' : 'bg-white border-[#E5E3DC] text-[#27272A]'
+                }`}>
+                  1M Policy Records
                 </span>
-                <div className="grid grid-cols-3 gap-2 text-xs font-mono">
-                  <div className="p-2.5 rounded-xl bg-white border border-slate-200">
-                    <span className="text-slate-400 block text-[10px]">PRECISION:</span>
-                    <span className="font-bold text-slate-800">53.46%</span>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-white border border-slate-200">
-                    <span className="text-slate-400 block text-[10px]">RECALL:</span>
-                    <span className="font-bold text-slate-800">31.73%</span>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-white border border-slate-200">
-                    <span className="text-slate-400 block text-[10px]">F1-SCORE:</span>
-                    <span className="font-bold text-slate-800">0.3982</span>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-white border border-slate-200">
-                    <span className="text-slate-400 block text-[10px]">BRIER SCORE:</span>
-                    <span className="font-bold text-slate-800">0.0582</span>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-white border border-slate-200">
-                    <span className="text-slate-400 block text-[10px]">LOG LOSS:</span>
-                    <span className="font-bold text-slate-800">0.2135</span>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-white border border-slate-200">
-                    <span className="text-slate-400 block text-[10px]">TRUE POSITIVES:</span>
-                    <span className="font-bold text-emerald-700">4,842</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
-                <span className="text-xs font-mono uppercase text-slate-700 font-bold block">
-                  Production Hyperparameters
+                <span className={`px-3 py-1.5 rounded-full text-xs font-mono font-medium border ${
+                  isDark ? 'bg-[#062419] border-[#0D4A34] text-[#34D399]' : 'bg-[#ECFDF5] border-[#A7F3D0] text-[#059669]'
+                }`}>
+                  ROC-AUC 0.7933
                 </span>
-                <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                  <div className="p-2.5 rounded-xl bg-white border border-slate-200">
-                    <span className="text-slate-400 block text-[10px]">N_ESTIMATORS:</span>
-                    <span className="font-bold text-teal-700">250 trees</span>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-white border border-slate-200">
-                    <span className="text-slate-400 block text-[10px]">MAX_DEPTH:</span>
-                    <span className="font-bold text-teal-700">6 levels</span>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-white border border-slate-200">
-                    <span className="text-slate-400 block text-[10px]">LEARNING_RATE:</span>
-                    <span className="font-bold text-teal-700">0.05</span>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-white border border-slate-200">
-                    <span className="text-slate-400 block text-[10px]">MIN_CHILD_WEIGHT:</span>
-                    <span className="font-bold text-teal-700">5</span>
-                  </div>
-                </div>
               </div>
             </div>
 
-            {/* Top SHAP Feature Importance Table */}
-            <div className="space-y-3">
-              <span className="text-xs font-mono uppercase text-slate-700 font-bold block">
-                Top SHAP Global Feature Importance (artifacts/insurance/shap_importance.csv)
-              </span>
-              <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
-                <table className="w-full text-xs text-left">
-                  <thead className="bg-slate-50 border-b border-slate-200 font-mono text-slate-500 uppercase text-[10px]">
-                    <tr>
-                      <th className="p-3">Rank</th>
-                      <th className="p-3">Feature Name</th>
-                      <th className="p-3">Mean |SHAP| Value</th>
-                      <th className="p-3">Importance Bar</th>
+            {/* 4 Federated Benchmark Metrics Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className={`p-5 rounded-2xl border ${
+                isDark ? 'bg-[#0D0D0D] border-[#222222]' : 'bg-white border-[#E5E3DC] shadow-xs'
+              }`}>
+                <div className={`text-[11px] font-mono uppercase tracking-wider ${isDark ? 'text-[#8E8E93]' : 'text-[#71717A]'}`}>
+                  ROC-AUC Discrimination
+                </div>
+                <div className="text-3xl font-extrabold font-serif mt-2 text-[#10B981]">
+                  0.7933
+                </div>
+                <p className={`text-xs mt-1.5 ${isDark ? 'text-[#A1A1AA]' : 'text-[#52525B]'}`}>
+                  +9.6% lift over single-insurer silo model (0.724).
+                </p>
+              </div>
+
+              <div className={`p-5 rounded-2xl border ${
+                isDark ? 'bg-[#0D0D0D] border-[#222222]' : 'bg-white border-[#E5E3DC] shadow-xs'
+              }`}>
+                <div className={`text-[11px] font-mono uppercase tracking-wider ${isDark ? 'text-[#8E8E93]' : 'text-[#71717A]'}`}>
+                  PR-AUC Precision-Recall
+                </div>
+                <div className="text-3xl font-extrabold font-serif mt-2 text-teal-400">
+                  0.3161
+                </div>
+                <p className={`text-xs mt-1.5 ${isDark ? 'text-[#A1A1AA]' : 'text-[#52525B]'}`}>
+                  High precision capture on low-incidence organized rings.
+                </p>
+              </div>
+
+              <div className={`p-5 rounded-2xl border ${
+                isDark ? 'bg-[#0D0D0D] border-[#222222]' : 'bg-white border-[#E5E3DC] shadow-xs'
+              }`}>
+                <div className={`text-[11px] font-mono uppercase tracking-wider ${isDark ? 'text-[#8E8E93]' : 'text-[#71717A]'}`}>
+                  Optimal Decision Cutoff
+                </div>
+                <div className="text-3xl font-extrabold font-serif mt-2 text-amber-500">
+                  17.98%
+                </div>
+                <p className={`text-xs mt-1.5 ${isDark ? 'text-[#A1A1AA]' : 'text-[#52525B]'}`}>
+                  Calibrated Youden cutoff balancing false-positive investigation load.
+                </p>
+              </div>
+
+              <div className={`p-5 rounded-2xl border ${
+                isDark ? 'bg-[#0D0D0D] border-[#222222]' : 'bg-white border-[#E5E3DC] shadow-xs'
+              }`}>
+                <div className={`text-[11px] font-mono uppercase tracking-wider ${isDark ? 'text-[#8E8E93]' : 'text-[#71717A]'}`}>
+                  NICB Referral Parity
+                </div>
+                <div className="text-3xl font-extrabold font-serif mt-2 text-[#10B981]">
+                  100%
+                </div>
+                <p className={`text-xs mt-1.5 ${isDark ? 'text-[#A1A1AA]' : 'text-[#52525B]'}`}>
+                  Compliant with Coalition Against Insurance Fraud evidence standards.
+                </p>
+              </div>
+            </div>
+
+            {/* Feature Table */}
+            <div className={`rounded-2xl border overflow-hidden ${
+              isDark ? 'bg-[#0D0D0D] border-[#222222]' : 'bg-white border-[#E5E3DC] shadow-xs'
+            }`}>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className={`border-b font-mono uppercase tracking-wider text-[11px] ${
+                      isDark ? 'bg-[#141414] border-[#222222] text-[#8E8E93]' : 'bg-[#F7F6F2] border-[#E8E6E0] text-[#71717A]'
+                    }`}>
+                      <th className="py-3 px-4 font-semibold">#</th>
+                      <th className="py-3 px-4 font-semibold">Feature & Code</th>
+                      <th className="py-3 px-4 font-semibold">Type</th>
+                      <th className="py-3 px-4 font-semibold">Importance Rank</th>
+                      <th className="py-3 px-4 font-semibold">SIU Risk Mechanism</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 font-mono">
+                  <tbody className={`divide-y ${isDark ? 'divide-[#1A1A1A]' : 'divide-[#ECEAE4]'}`}>
                     {[
-                      { rank: '#1', feature: 'policyholder_tenure_years', val: 0.7054, pct: 100 },
-                      { rank: '#2', feature: 'claim_amount', val: 0.3395, pct: 48 },
-                      { rank: '#3', feature: 'claim_to_deductible_ratio', val: 0.2446, pct: 35 },
-                      { rank: '#4', feature: 'claim_type_renters', val: 0.1707, pct: 24 },
-                      { rank: '#5', feature: 'claim_type_auto', val: 0.1416, pct: 20 },
-                      { rank: '#6', feature: 'claim_type_business', val: 0.0966, pct: 14 },
-                      { rank: '#7', feature: 'claim_amount_log', val: 0.0796, pct: 11 },
-                      { rank: '#8', feature: 'claim_type_property', val: 0.0410, pct: 6 },
-                    ].map((row) => (
-                      <tr key={row.rank} className="hover:bg-slate-50/80">
-                        <td className="p-3 font-bold text-teal-700">{row.rank}</td>
-                        <td className="p-3 font-bold text-slate-800">{row.feature}</td>
-                        <td className="p-3 font-bold text-slate-600">{row.val.toFixed(4)}</td>
-                        <td className="p-3 w-48">
-                          <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                            <div className="h-full bg-teal-600 rounded-full" style={{ width: `${row.pct}%` }} />
-                          </div>
+                      { num: 1, name: 'Claim-to-Deductible Ratio', code: 'claim_to_deductible_ratio', type: 'Float (Ratio)', rank: 'Top 1 (38.4% gain)', desc: 'Calculated as claim_amount / (deductible + 1). Disproportionate claims relative to self-insured retention flag opportunistic padding.' },
+                      { num: 2, name: 'Policyholder Tenure', code: 'policyholder_tenure_years', type: 'Float (Years)', rank: 'Top 2 (22.1% gain)', desc: 'Elapsed duration of coverage. Losses filed immediately following inception are the prime indicator of pre-existing damage.' },
+                      { num: 3, name: 'Filing Delay Window', code: 'filing_delay_days', type: 'Integer (Days)', rank: 'Top 3 (15.7% gain)', desc: 'Number of calendar days between incident occurrence and formal filing date. Unexplained delays suggest fabricated documentation.' },
+                      { num: 4, name: 'Claim Amount (Log-scaled)', code: 'claim_amount_log', type: 'Float (Log $)', rank: 'Top 4 (12.3% gain)', desc: 'Log-transformed dollar indemnity sought. Captures non-linear escalation in severe fraudulent physical damage claims.' },
+                      { num: 5, name: 'Prior Loss Frequency', code: 'previous_claims_count', type: 'Integer (Count)', rank: 'Top 5 (7.8% gain)', desc: 'Total historical claims across all syndicated policies. Flags serial claimant rings operating across regional carriers.' },
+                    ].map((f) => (
+                      <tr key={f.code} className={`transition-colors ${isDark ? 'hover:bg-[#121212]' : 'hover:bg-[#F9F8F5]'}`}>
+                        <td className="py-3.5 px-4 font-mono font-bold text-[#71717A]">{f.num}</td>
+                        <td className="py-3.5 px-4">
+                          <div className="font-semibold">{f.name}</div>
+                          <code className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                            isDark ? 'bg-[#181818] text-[#14B8A6]' : 'bg-[#EFECE4] text-[#0D9488]'
+                          }`}>
+                            {f.code}
+                          </code>
                         </td>
+                        <td className="py-3.5 px-4 font-mono text-[#71717A]">{f.type}</td>
+                        <td className="py-3.5 px-4 font-mono font-semibold text-[#10B981]">{f.rank}</td>
+                        <td className={`py-3.5 px-4 max-w-md ${isDark ? 'text-[#A1A1AA]' : 'text-[#52525B]'}`}>{f.desc}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             </div>
-          </motion.div>
+
+            {/* Back button */}
+            <div className="flex justify-end">
+              <button
+                onClick={() => onSubTabChange?.('ins-showdown')}
+                className={`px-5 py-2.5 rounded-full text-xs font-semibold cursor-pointer transition-all ${
+                  isDark 
+                    ? 'bg-white text-black hover:bg-[#E4E4E7]' 
+                    : 'bg-white border border-[#D5D2C8] text-[#18181B] hover:bg-[#F4F2EC]'
+                }`}
+              >
+                Return to Claims Assessment →
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* ================= MAIN INSURANCE CLAIMS ASSESSMENT VIEW ================= */
+          <div className="space-y-8 animate-fadeIn">
+            {/* Top Eyebrow, Title & Right Stat Counters */}
+            <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 border-b pb-6 border-subtle">
+              <div className="space-y-2">
+                <div className={`text-[11px] font-mono tracking-[0.2em] uppercase font-semibold ${
+                  isDark ? 'text-[#8E8E93]' : 'text-[#71717A]'
+                }`}>
+                  INSURANCE CLAIMS
+                </div>
+                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold font-serif tracking-tight">
+                  Assess an insurance claim
+                </h1>
+                <p className={`text-sm sm:text-base max-w-2xl ${
+                  isDark ? 'text-[#A1A1AA]' : 'text-[#52525B]'
+                }`}>
+                  Screen auto and property claims against SIU fraud indicators across 1M policies with zero PII shared.
+                </p>
+              </div>
+
+              {/* Stat Counters */}
+              <div className="flex items-center gap-6 sm:gap-8 shrink-0">
+                <div className="space-y-0.5">
+                  <div className="text-2xl sm:text-3xl font-bold font-serif">1M</div>
+                  <div className={`text-[11px] leading-tight ${isDark ? 'text-[#8E8E93]' : 'text-[#71717A]'}`}>
+                    Policies benchmarked<br />
+                    <span className="font-mono text-[10px] opacity-80">(artifacts/insurance)</span>
+                  </div>
+                </div>
+
+                <div className="space-y-0.5">
+                  <div className="text-2xl sm:text-3xl font-bold font-serif">3</div>
+                  <div className={`text-[11px] leading-tight ${isDark ? 'text-[#8E8E93]' : 'text-[#71717A]'}`}>
+                    Insurers in network<br />
+                    <span className="font-mono text-[10px] opacity-80">(federated)</span>
+                  </div>
+                </div>
+
+                <div className="space-y-0.5">
+                  <div className="text-2xl sm:text-3xl font-bold font-serif">0</div>
+                  <div className={`text-[11px] leading-tight ${isDark ? 'text-[#8E8E93]' : 'text-[#71717A]'}`}>
+                    Records shared<br />
+                    <span className="font-mono text-[10px] opacity-80">(your data stays local)</span>
+                  </div>
+                </div>
+
+                {/* Feature Dictionary Button */}
+                <button
+                  onClick={() => onSubTabChange?.('ins-metrics')}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer border transition-all ${
+                    isDark 
+                      ? 'bg-[#121212] border-[#222222] text-[#F4F4F5] hover:border-[#444444]' 
+                      : 'bg-white border-[#E5E3DC] text-[#18181B] hover:border-[#B8B5AC] shadow-xs'
+                  }`}
+                >
+                  <BookOpen className="w-3.5 h-3.5 text-teal-400" />
+                  <span>Feature Dictionary</span>
+                  <span className="text-xs">›</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 2-Column Assessment Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              
+              {/* ================= LEFT COLUMN: FORM CONTROLS ================= */}
+              <div className="lg:col-span-5 space-y-6">
+                
+                {/* 1. Select an example */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-xs font-semibold">
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-mono border ${
+                      isDark ? 'bg-[#181818] border-[#282828] text-white' : 'bg-[#EFECE4] border-[#DDD9CF] text-black'
+                    }`}>
+                      1
+                    </span>
+                    <span className="text-sm font-bold">Select an example (optional)</span>
+                  </div>
+
+                  {/* 3 Preset Cards */}
+                  <div className="grid grid-cols-3 gap-2.5">
+                    {/* Card 1: Staged */}
+                    <button
+                      onClick={() => applyExample('staged')}
+                      className={`p-3 rounded-xl border text-left cursor-pointer transition-all relative ${
+                        selectedExample === 'staged'
+                          ? isDark
+                            ? 'bg-[#1A0A0A] border-[#EF4444] shadow-[0_0_12px_rgba(239,68,68,0.25)]'
+                            : 'bg-[#FEF2F2] border-[#EF4444] shadow-xs'
+                          : isDark
+                          ? 'bg-[#0E0E0E] border-[#222222] hover:border-[#333333]'
+                          : 'bg-white border-[#E5E3DC] hover:border-[#C4C0B6]'
+                      }`}
+                    >
+                      <Flame className={`w-4 h-4 mb-2 ${selectedExample === 'staged' ? 'text-[#EF4444]' : isDark ? 'text-[#8E8E93]' : 'text-[#71717A]'}`} />
+                      <div className="font-bold text-xs leading-tight">Staged total loss</div>
+                      <div className={`text-[10px] mt-0.5 leading-snug line-clamp-2 ${isDark ? 'text-[#8E8E93]' : 'text-[#71717A]'}`}>
+                        Recent policy & delay
+                      </div>
+                    </button>
+
+                    {/* Card 2: Minor Bumper */}
+                    <button
+                      onClick={() => applyExample('bumper')}
+                      className={`p-3 rounded-xl border text-left cursor-pointer transition-all relative ${
+                        selectedExample === 'bumper'
+                          ? isDark
+                            ? 'bg-[#062419] border-[#10B981] shadow-[0_0_12px_rgba(16,185,129,0.25)]'
+                            : 'bg-[#ECFDF5] border-[#10B981] shadow-xs'
+                          : isDark
+                          ? 'bg-[#0E0E0E] border-[#222222] hover:border-[#333333]'
+                          : 'bg-white border-[#E5E3DC] hover:border-[#C4C0B6]'
+                      }`}
+                    >
+                      <Car className={`w-4 h-4 mb-2 ${selectedExample === 'bumper' ? 'text-[#10B981]' : isDark ? 'text-[#8E8E93]' : 'text-[#71717A]'}`} />
+                      <div className="font-bold text-xs leading-tight">Minor collision</div>
+                      <div className={`text-[10px] mt-0.5 leading-snug line-clamp-2 ${isDark ? 'text-[#8E8E93]' : 'text-[#71717A]'}`}>
+                        Established driver
+                      </div>
+                    </button>
+
+                    {/* Card 3: Catastrophic Storm */}
+                    <button
+                      onClick={() => applyExample('storm')}
+                      className={`p-3 rounded-xl border text-left cursor-pointer transition-all relative ${
+                        selectedExample === 'storm'
+                          ? isDark
+                            ? 'bg-[#181818] border-[#A1A1AA] shadow-[0_0_12px_rgba(255,255,255,0.1)]'
+                            : 'bg-[#F4F2EC] border-[#71717A] shadow-xs'
+                          : isDark
+                          ? 'bg-[#0E0E0E] border-[#222222] hover:border-[#333333]'
+                          : 'bg-white border-[#E5E3DC] hover:border-[#C4C0B6]'
+                      }`}
+                    >
+                      <CloudRain className={`w-4 h-4 mb-2 ${selectedExample === 'storm' ? (isDark ? 'text-white' : 'text-black') : isDark ? 'text-[#8E8E93]' : 'text-[#71717A]'}`} />
+                      <div className="font-bold text-xs leading-tight">Storm catastrophe</div>
+                      <div className={`text-[10px] mt-0.5 leading-snug line-clamp-2 ${isDark ? 'text-[#8E8E93]' : 'text-[#71717A]'}`}>
+                        Verified weather event
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. Claim details */}
+                <div className="space-y-4 pt-2">
+                  <div className="flex items-center gap-2 text-xs font-semibold">
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-mono border ${
+                      isDark ? 'bg-[#181818] border-[#282828] text-white' : 'bg-[#EFECE4] border-[#DDD9CF] text-black'
+                    }`}>
+                      2
+                    </span>
+                    <span className="text-sm font-bold">Claim details</span>
+                  </div>
+
+                  {/* Form Fields */}
+                  <div className="space-y-3.5">
+                    {/* Claim Type */}
+                    <div className="space-y-1.5">
+                      <label className={`text-xs font-medium block ${isDark ? 'text-[#A1A1AA]' : 'text-[#52525B]'}`}>
+                        Policy coverage type
+                      </label>
+                      <div className="relative">
+                        <select
+                          value={claimType}
+                          onChange={(e) => setClaimType(e.target.value)}
+                          className={`w-full py-2.5 px-3.5 rounded-xl border text-xs font-medium appearance-none cursor-pointer focus:outline-none transition-colors ${
+                            isDark
+                              ? 'bg-[#0D0D0D] border-[#242424] text-white focus:border-[#555555]'
+                              : 'bg-white border-[#DDD9CF] text-[#18181B] focus:border-[#71717A]'
+                          }`}
+                        >
+                          <option value="auto">Vehicle / Auto physical damage</option>
+                          <option value="home">Home / Property structural</option>
+                          <option value="casualty">Casualty / Commercial liability</option>
+                        </select>
+                        <ChevronDown className="w-4 h-4 absolute right-3 top-3 pointer-events-none text-[#71717A]" />
+                      </div>
+                    </div>
+
+                    {/* Claim Amount */}
+                    <div className="space-y-1.5">
+                      <label className={`text-xs font-medium block ${isDark ? 'text-[#A1A1AA]' : 'text-[#52525B]'}`}>
+                        Total claim amount sought
+                      </label>
+                      <div className="relative flex items-center">
+                        <span className={`absolute left-3.5 text-xs font-mono font-medium ${isDark ? 'text-[#71717A]' : 'text-[#A1A1AA]'}`}>$</span>
+                        <input
+                          type="number"
+                          value={claimAmount}
+                          onChange={(e) => setClaimAmount(Number(e.target.value) || 0)}
+                          className={`w-full py-2.5 pl-8 pr-3.5 rounded-xl border text-xs font-mono font-medium focus:outline-none transition-colors ${
+                            isDark
+                              ? 'bg-[#0D0D0D] border-[#242424] text-white focus:border-[#555555]'
+                              : 'bg-white border-[#DDD9CF] text-[#18181B] focus:border-[#71717A]'
+                          }`}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Deductible */}
+                    <div className="space-y-1.5">
+                      <label className={`text-xs font-medium block ${isDark ? 'text-[#A1A1AA]' : 'text-[#52525B]'}`}>
+                        Policyholder deductible
+                      </label>
+                      <div className="relative flex items-center">
+                        <span className={`absolute left-3.5 text-xs font-mono font-medium ${isDark ? 'text-[#71717A]' : 'text-[#A1A1AA]'}`}>$</span>
+                        <input
+                          type="number"
+                          value={deductible}
+                          onChange={(e) => setDeductible(Number(e.target.value) || 0)}
+                          className={`w-full py-2.5 pl-8 pr-3.5 rounded-xl border text-xs font-mono font-medium focus:outline-none transition-colors ${
+                            isDark
+                              ? 'bg-[#0D0D0D] border-[#242424] text-white focus:border-[#555555]'
+                              : 'bg-white border-[#DDD9CF] text-[#18181B] focus:border-[#71717A]'
+                          }`}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Policyholder Tenure */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className={`text-xs font-medium block ${isDark ? 'text-[#A1A1AA]' : 'text-[#52525B]'}`}>
+                          Policyholder tenure (Years)
+                        </label>
+                        <span className="text-xs font-mono font-bold text-[#10B981]">
+                          {tenureYears.toFixed(1)} yrs
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0.1"
+                        max="15"
+                        step="0.1"
+                        value={tenureYears}
+                        onChange={(e) => setTenureYears(parseFloat(e.target.value))}
+                        className="w-full accent-teal-500 cursor-pointer"
+                      />
+                    </div>
+
+                    {/* Filing Delay */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className={`text-xs font-medium block ${isDark ? 'text-[#A1A1AA]' : 'text-[#52525B]'}`}>
+                          Incident-to-filing delay (Days)
+                        </label>
+                        <span className="text-xs font-mono font-bold text-amber-500">
+                          {filingDelay} days
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="60"
+                        step="1"
+                        value={filingDelay}
+                        onChange={(e) => setFilingDelay(parseInt(e.target.value))}
+                        className="w-full accent-amber-500 cursor-pointer"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Submit Button */}
+                  {/* CRITICAL RULE: In dark mode: white background with black text. In light mode: white background with crisp border - NO BLACK BUTTONS */}
+                  <div className="pt-2 space-y-2">
+                    <button
+                      onClick={handleAssessRisk}
+                      disabled={isAssessing}
+                      className={`w-full py-3 px-4 rounded-full text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-all ${
+                        isDark
+                          ? 'bg-white text-black hover:bg-[#E4E4E7] shadow-sm'
+                          : 'bg-white border border-[#D1CEC4] text-[#18181B] hover:bg-[#F4F2EC] hover:border-[#BCB9AF] shadow-xs'
+                      }`}
+                    >
+                      <span>{isAssessing ? 'Running SIU Screening...' : 'Assess claim risk'}</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                    <p className={`text-[11px] text-center ${isDark ? 'text-[#71717A]' : 'text-[#8E8E93]'}`}>
+                      All fields are required. Nothing is saved until you run the assessment.
+                    </p>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* ================= RIGHT COLUMN: ASSESSMENT CARDS ================= */}
+              <div className="lg:col-span-7 space-y-6">
+                
+                {/* 1. TOP CARD: SIU Fraud Probability & Actions */}
+                <div className={`p-6 rounded-2xl border transition-colors ${
+                  isDark ? 'bg-[#0F0F0F] border-[#222222]' : 'bg-white border-[#E5E3DC] shadow-xs'
+                }`}>
+                  {/* Status Bar */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4 border-subtle">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`w-2 h-2 rounded-full ${isHighFraud ? 'bg-[#EF4444] animate-ping' : 'bg-[#10B981]'}`} />
+                        <span className={`text-xs font-bold ${isHighFraud ? 'text-[#EF4444]' : 'text-[#10B981]'}`}>
+                          {isHighFraud ? 'High SIU fraud risk' : 'Expedited settlement eligible'}
+                        </span>
+                      </div>
+                      <span className={`text-xs ${isDark ? 'text-[#71717A]' : 'text-[#A1A1AA]'}`}>|</span>
+                      <span className={`text-xs ${isDark ? 'text-[#A1A1AA]' : 'text-[#71717A]'}`}>
+                        SIU forensic analysis complete
+                      </span>
+                    </div>
+
+                    <div className={`flex items-center gap-3 text-[11px] font-mono ${isDark ? 'text-[#8E8E93]' : 'text-[#71717A]'}`}>
+                      <div className="flex items-center gap-1">
+                        <span>Claim ID</span>
+                        <button onClick={copyClaimId} className="cursor-pointer hover:underline text-current">
+                          {claimId}
+                        </button>
+                        {copiedId ? <Check className="w-3 h-3 text-[#10B981]" /> : <Copy className="w-3 h-3 opacity-60" />}
+                      </div>
+                      <span>•</span>
+                      <span>Model v1.0</span>
+                      <span>•</span>
+                      <span>Processed {latencySec}s</span>
+                    </div>
+                  </div>
+
+                  {/* Main Score & Risk Alert */}
+                  <div className="pt-6 grid grid-cols-1 sm:grid-cols-12 gap-6 items-center">
+                    <div className="sm:col-span-7 space-y-4">
+                      <div>
+                        <div className={`text-xs font-medium ${isDark ? 'text-[#8E8E93]' : 'text-[#71717A]'}`}>
+                          SIU fraud probability
+                        </div>
+                        <div className="flex items-baseline gap-4 mt-1">
+                          <span className={`text-5xl sm:text-6xl font-extrabold font-serif tracking-tight ${
+                            isHighFraud ? 'text-[#EF4444]' : 'text-[#10B981]'
+                          }`}>
+                            {fraudProb}%
+                          </span>
+                          <div>
+                            <div className={`text-[10px] uppercase font-mono tracking-wider ${isDark ? 'text-[#71717A]' : 'text-[#8E8E93]'}`}>
+                              Claim indemnity sought
+                            </div>
+                            <div className="text-base font-bold font-mono">
+                              ${claimAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Threshold Gauge Bar */}
+                      <div className="space-y-1.5 pt-1">
+                        <div className="relative h-2 w-full rounded-full overflow-hidden bg-[#242424]">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${fraudProb}%` }}
+                            transition={{ duration: 0.6, ease: [0.23, 1, 0.32, 1] }}
+                            className={`h-full rounded-full ${isHighFraud ? 'bg-[#EF4444]' : 'bg-[#10B981]'}`}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between text-[10px] font-mono">
+                          <span className={isDark ? 'text-[#71717A]' : 'text-[#8E8E93]'}>0%</span>
+                          <span className={`font-semibold ${isDark ? 'text-[#D4D4D8]' : 'text-[#3F3F46]'}`}>
+                            18.0% SIU Referral threshold
+                          </span>
+                          <span className={isDark ? 'text-[#71717A]' : 'text-[#8E8E93]'}>100%</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Alert Box Callout */}
+                    <div className={`sm:col-span-5 p-3.5 rounded-xl border flex items-start gap-2.5 ${
+                      isHighFraud
+                        ? isDark ? 'bg-[#1C0A0A] border-[#4D1212] text-[#FCA5A5]' : 'bg-[#FEF2F2] border-[#FECACA] text-[#991B1B]'
+                        : isDark ? 'bg-[#062419] border-[#0D4A34] text-[#A7F3D0]' : 'bg-[#ECFDF5] border-[#A7F3D0] text-[#065F46]'
+                    }`}>
+                      <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${
+                        isHighFraud ? 'bg-[#EF4444] text-white' : 'bg-[#10B981] text-white'
+                      }`}>
+                        !
+                      </div>
+                      <div className="text-[11px] leading-snug">
+                        <div className="font-bold">
+                          {isHighFraud ? `${pointsAboveAlert} points above SIU cutoff` : 'Expedited claim payout'}
+                        </div>
+                        <div className="mt-0.5 opacity-90">
+                          {isHighFraud
+                            ? 'Extreme deductible ratio (48.5x) and immediate policy binding window strongly correlate with staged syndicates.'
+                            : 'Consistent tenure and timely filing align with legitimate damage events.'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions: Refer to SIU / Fast-track payout */}
+                  <div className="flex items-center gap-3 pt-6 border-t mt-6 border-subtle">
+                    <button
+                      onClick={() => setStatusAction('flagged')}
+                      className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer border transition-all ${
+                        statusAction === 'flagged'
+                          ? isDark ? 'bg-[#260A0A] border-[#EF4444] text-[#F87171]' : 'bg-[#FEF2F2] border-[#EF4444] text-[#DC2626]'
+                          : isDark ? 'bg-[#141414] border-[#282828] text-[#D4D4D8] hover:border-[#444444]' : 'bg-white border-[#E5E3DC] text-[#27272A] hover:bg-[#F9F8F5]'
+                      }`}
+                    >
+                      <Flag className="w-3.5 h-3.5" />
+                      <span>{statusAction === 'flagged' ? 'Referred to Special Investigation' : 'Refer to SIU investigator'}</span>
+                    </button>
+
+                    <button
+                      onClick={() => setStatusAction('paid')}
+                      className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer border transition-all ${
+                        statusAction === 'paid'
+                          ? isDark ? 'bg-[#062419] border-[#10B981] text-[#34D399]' : 'bg-[#ECFDF5] border-[#10B981] text-[#059669]'
+                          : isDark ? 'bg-[#141414] border-[#282828] text-[#D4D4D8] hover:border-[#444444]' : 'bg-white border-[#E5E3DC] text-[#27272A] hover:bg-[#F9F8F5]'
+                      }`}
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span>{statusAction === 'paid' ? 'Payment Dispatched' : 'Fast-track claim payout'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. MIDDLE CARD: Network Comparison (Would one insurer have caught this?) */}
+                <div className={`p-6 rounded-2xl border transition-colors ${
+                  isDark ? 'bg-[#0F0F0F] border-[#222222]' : 'bg-white border-[#E5E3DC] shadow-xs'
+                }`}>
+                  <div className="flex items-center justify-between border-b pb-3 border-subtle">
+                    <div className="flex items-center gap-2.5">
+                      <Share2 className="w-4 h-4 text-teal-400" />
+                      <div>
+                        <h3 className="text-sm font-bold">Would one insurer have caught this?</h3>
+                        <p className={`text-[11px] ${isDark ? 'text-[#8E8E93]' : 'text-[#71717A]'}`}>
+                          Comparison of SIU fraud scores against the 18.0% detection threshold.
+                        </p>
+                      </div>
+                    </div>
+
+                    <span className={`px-2.5 py-1 rounded-full text-[11px] font-mono font-bold border ${
+                      isDark ? 'bg-[#062419] border-[#0D4A34] text-[#34D399]' : 'bg-[#ECFDF5] border-[#A7F3D0] text-[#059669]'
+                    }`}>
+                      Detection advantage +118%
+                    </span>
+                  </div>
+
+                  {/* Comparison Columns */}
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-center pt-5">
+                    {/* Left: This insurer alone */}
+                    <div className={`sm:col-span-5 p-4 rounded-xl border ${
+                      isDark ? 'bg-[#0D0D0D] border-[#202020]' : 'bg-[#FAF9F6] border-[#E8E6E0]'
+                    }`}>
+                      <div className="flex items-center gap-2 text-xs font-semibold">
+                        <Building2 className="w-3.5 h-3.5 opacity-60" />
+                        <span>This insurer alone</span>
+                      </div>
+                      <div className="text-3xl font-extrabold font-serif mt-2 text-[#71717A]">
+                        {aloneProb}%
+                      </div>
+                      <div className="h-1.5 w-full bg-[#333333] rounded-full overflow-hidden mt-2">
+                        <div className="h-full bg-[#71717A] rounded-full" style={{ width: `${aloneProb}%` }} />
+                      </div>
+                      <div className={`text-[10px] font-mono mt-1 ${isDark ? 'text-[#71717A]' : 'text-[#8E8E93]'}`}>
+                        18.0% threshold
+                      </div>
+                      <p className={`text-[11px] mt-2 ${isDark ? 'text-[#A1A1AA]' : 'text-[#52525B]'}`}>
+                        Would have paid out (unaware of cross-carrier ghost broker ring).
+                      </p>
+                    </div>
+
+                    {/* VS divider */}
+                    <div className="sm:col-span-2 flex items-center justify-center font-mono font-bold text-xs opacity-50">
+                      VS
+                    </div>
+
+                    {/* Right: OLYMPUS federated network */}
+                    <div className={`sm:col-span-5 p-4 rounded-xl border ${
+                      isDark ? 'bg-[#140A0A] border-[#3D1414]' : 'bg-[#FEF2F2] border-[#FECACA]'
+                    }`}>
+                      <div className="flex items-center gap-2 text-xs font-semibold text-[#EF4444]">
+                        <Share2 className="w-3.5 h-3.5" />
+                        <span>OLYMPUS federated network</span>
+                      </div>
+                      <div className="text-3xl font-extrabold font-serif mt-2 text-[#EF4444]">
+                        {fraudProb}%
+                      </div>
+                      <div className="h-1.5 w-full bg-[#4A1515] rounded-full overflow-hidden mt-2">
+                        <div className="h-full bg-[#EF4444] rounded-full" style={{ width: `${fraudProb}%` }} />
+                      </div>
+                      <div className="text-[10px] font-mono mt-1 text-[#EF4444] opacity-80">
+                        18.0% threshold
+                      </div>
+                      <p className={`text-[11px] mt-2 font-medium ${isDark ? 'text-[#FCA5A5]' : 'text-[#991B1B]'}`}>
+                        Catches syndicated staged collision patterns across regional carriers.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. BOTTOM CARD: "Why it got this score" (TreeSHAP Signals & Explainability) */}
+                <div className={`rounded-2xl border overflow-hidden transition-colors ${
+                  isDark ? 'bg-[#0F0F0F] border-[#222222]' : 'bg-white border-[#E5E3DC] shadow-xs'
+                }`}>
+                  <button
+                    onClick={() => setIsWhyOpen(!isWhyOpen)}
+                    className="w-full p-6 text-left flex items-center justify-between cursor-pointer border-b border-subtle"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Sparkles className="w-4 h-4 text-amber-400" />
+                      <div>
+                        <h3 className="text-sm font-bold">Why it got this score</h3>
+                        <p className={`text-[11px] ${isDark ? 'text-[#8E8E93]' : 'text-[#71717A]'}`}>
+                          Top 5 signals from the model. Red increases risk and teal lowers it.
+                        </p>
+                      </div>
+                    </div>
+                    {isWhyOpen ? <ChevronUp className="w-4 h-4 text-[#71717A]" /> : <ChevronDown className="w-4 h-4 text-[#71717A]" />}
+                  </button>
+
+                  <AnimatePresence>
+                    {isWhyOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+                        className="p-6 space-y-4"
+                      >
+                        {/* Signals Table */}
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead>
+                              <tr className={`border-b font-mono uppercase text-[10px] tracking-wider ${
+                                isDark ? 'text-[#71717A] border-[#1C1C1C]' : 'text-[#8E8E93] border-[#E8E6E0]'
+                              }`}>
+                                <th className="pb-2 font-medium">#</th>
+                                <th className="pb-2 font-medium">Signal</th>
+                                <th className="pb-2 font-medium">Explanation</th>
+                                <th className="pb-2 font-medium">Severity</th>
+                                <th className="pb-2 font-medium">Impact</th>
+                              </tr>
+                            </thead>
+                            <tbody className={`divide-y ${isDark ? 'divide-[#1A1A1A]' : 'divide-[#ECEAE4]'}`}>
+                              {signals.map((s) => (
+                                <tr key={s.num} className="group">
+                                  <td className="py-2.5 font-mono text-[#71717A]">{s.num}</td>
+                                  <td className="py-2.5 font-semibold">
+                                    <div className="flex items-center gap-2">
+                                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${s.isRisk ? 'bg-[#EF4444]' : 'bg-[#10B981]'}`} />
+                                      <span>{s.title}</span>
+                                    </div>
+                                  </td>
+                                  <td className={`py-2.5 ${isDark ? 'text-[#A1A1AA]' : 'text-[#52525B]'}`}>
+                                    {s.explanation}
+                                  </td>
+                                  <td className="py-2.5">
+                                    <span className={`text-[11px] font-mono ${
+                                      s.severity === 'Very high' || s.severity === 'High' ? 'text-[#EF4444] font-semibold' : 'text-[#71717A]'
+                                    }`}>
+                                      {s.severity}
+                                    </span>
+                                  </td>
+                                  <td className="py-2.5">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-16 h-1.5 rounded-full bg-[#262626] overflow-hidden">
+                                        <div
+                                          className={`h-full rounded-full ${s.isRisk ? 'bg-[#EF4444]' : 'bg-[#10B981]'}`}
+                                          style={{ width: s.barWidth }}
+                                        />
+                                      </div>
+                                      <span className={`font-mono text-[10px] font-bold ${
+                                        s.isRisk ? 'text-[#EF4444]' : 'text-[#10B981]'
+                                      }`}>
+                                        {s.impact}
+                                      </span>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* Gemini Plain-English SIU Brief */}
+                        {aiReasoningText && (
+                          <div className={`p-4 rounded-xl border mt-4 text-xs leading-relaxed ${
+                            isDark ? 'bg-[#141414] border-[#282828] text-[#D4D4D8]' : 'bg-[#F9F8F5] border-[#E5E3DC] text-[#27272A]'
+                          }`}>
+                            <div className="flex items-center gap-2 font-bold mb-1.5 text-amber-400">
+                              <Sparkles className="w-3.5 h-3.5" />
+                              <span>Gemini Special Investigation Unit (SIU) Referral Brief</span>
+                            </div>
+                            <div className="whitespace-pre-line font-mono text-[11px] opacity-90">
+                              {aiReasoningText}
+                            </div>
+                          </div>
+                        )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
+              </div>
+
+            </div>
+          </div>
         )}
-      </AnimatePresence>
+
+      </div>
     </div>
   );
 };

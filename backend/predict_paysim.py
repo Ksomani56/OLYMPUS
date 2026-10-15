@@ -163,13 +163,8 @@ def assess_transaction(payload, artifact_path=ARTIFACT):
         except Exception:
             pass
 
-    if not reasons and hasattr(model, "feature_importances_"):
-        top_indices = np.argsort(model.feature_importances_)[::-1][:5]
-        reasons = [{
-            "feature": names[int(index)],
-            "impact_log_odds": float(model.feature_importances_[index]),
-            "direction": "increases_risk",
-        } for index in top_indices]
+    # When transaction-level SHAP impacts are unavailable, omit risk factors rather
+    # than misleadingly presenting global feature_importances_ as directional log-odds.
 
     is_fraud_alert = probability >= threshold
     post_transaction_features = {
