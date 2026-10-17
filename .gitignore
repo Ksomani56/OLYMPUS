@@ -43,6 +43,3 @@ MD/
 AGENT.md
 AGENTS.md
 ARCHITECTURE_AUDIT.md
-*.md
-!README.md
-!**/README.md

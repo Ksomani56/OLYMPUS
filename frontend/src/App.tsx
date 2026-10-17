@@ -1,37 +1,34 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  ShieldCheck, 
-  Lock, 
-  Sparkles,
-  ArrowUpRight,
-  Database
-} from 'lucide-react';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
+import { SharedHeader } from './components/layout/SharedHeader';
 
-import { ParticlesBackground } from './components/react-bits/ParticlesBackground';
-import { ModernTabsWithHover } from './components/tabs/ModernTabsWithHover';
-import { JudgeDemoBar } from './components/demo/JudgeDemoBar';
-
-import { IntelligenceAndGovView } from './components/views/IntelligenceAndGovView';
-import { CreditFraudView } from './components/views/CreditFraudView';
+import { BankPaymentsView } from './components/views/BankPaymentsView';
+import { CreditApplicationsView } from './components/views/CreditApplicationsView';
 import { InsuranceClaimsView } from './components/views/InsuranceClaimsView';
+import { CybersecurityGatewayView } from './components/views/CybersecurityGatewayView';
 
-import { Hero3DStage } from './components/hero/Hero3DStage';
-import { IntroPage } from './components/pages/IntroPage';
-import { ArrowLeft, ArrowRight, Home } from 'lucide-react';
+function AppContent() {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
 
-export function App() {
   const parseHash = () => {
-    if (typeof window === 'undefined') return { page: 'intro', main: 'intelligence', sub: 'showdown' };
+    if (typeof window === 'undefined') return { main: 'intelligence' as const, sub: 'showdown' };
     const raw = window.location.hash.replace('#', '');
     const [part1, part2] = raw.split('/');
-    
-    if (part1 === 'intro' || !part1) {
-      return { page: 'intro', main: 'intelligence', sub: 'showdown' };
+
+    const validMains = ['intelligence', 'creditfraud', 'insurance', 'security', 'soc'] as const;
+    let main: 'intelligence' | 'creditfraud' | 'insurance' | 'security' = 'intelligence';
+
+    if (part1 === 'security' || part1 === 'soc') {
+      main = 'security';
+    } else if (part1 === 'creditfraud') {
+      main = 'creditfraud';
+    } else if (part1 === 'insurance') {
+      main = 'insurance';
+    } else {
+      main = 'intelligence';
     }
-    
-    const validMains = ['intelligence', 'creditfraud', 'insurance'];
-    const main = validMains.includes(part1) ? part1 : 'intelligence';
 
     let sub = part2;
     if (!sub) {
@@ -39,29 +36,18 @@ export function App() {
       else if (main === 'insurance') sub = 'ins-showdown';
       else sub = (part1 === 'dictionary' ? 'dictionary' : 'showdown');
     }
-    return { page: 'features', main, sub };
+    return { main, sub };
   };
 
   const initialParsed = parseHash();
-  const [pageMode, setPageMode] = useState<'intro' | 'features'>(initialParsed.page as 'intro' | 'features');
-  const [activeMainTab, setActiveMainTab] = useState<string>(initialParsed.main);
+  const [activeMainTab, setActiveMainTab] = useState<'intelligence' | 'creditfraud' | 'insurance' | 'security'>(initialParsed.main);
   const [activeSubTab, setActiveSubTab] = useState<string>(initialParsed.sub);
-
-  // Typography Combination State (Auge Complete Family vs Inter vs Plus Jakarta)
-  const [fontCombo, setFontCombo] = useState<'auge' | 'inter' | 'jakarta'>('auge');
-
-  // Blue & Green Color Theme Palette Vibe
-  const [colorVibe, setColorVibe] = useState<'ocean-mint' | 'emerald-cyan'>('ocean-mint');
-
-  // 3-Minute Demo State
-  const [demoStep, setDemoStep] = useState<number>(1);
   const [isRunningAutoDemo, setIsRunningAutoDemo] = useState<boolean>(false);
 
-  // Listen to hash change from browser or deep link
-  React.useEffect(() => {
+  // Sync hash routing with window
+  useEffect(() => {
     const onHashChange = () => {
       const parsed = parseHash();
-      setPageMode(parsed.page as 'intro' | 'features');
       setActiveMainTab(parsed.main);
       setActiveSubTab(parsed.sub);
     };
@@ -69,291 +55,174 @@ export function App() {
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
 
-  const handleSelectTab = (mainTabId: string, subTabId?: string) => {
-    setPageMode('features');
+  const handleSelectMainTab = (mainTabId: 'intelligence' | 'creditfraud' | 'insurance' | 'security', subTabId?: string) => {
     setActiveMainTab(mainTabId);
 
-    let resolvedSubTab = subTabId;
-    if (!resolvedSubTab) {
-      if (mainTabId === 'creditfraud') resolvedSubTab = 'cf-showdown';
-      else if (mainTabId === 'insurance') resolvedSubTab = 'ins-showdown';
-      else resolvedSubTab = 'showdown';
+    let resolvedSub = subTabId;
+    if (!resolvedSub) {
+      if (mainTabId === 'creditfraud') resolvedSub = 'cf-showdown';
+      else if (mainTabId === 'insurance') resolvedSub = 'ins-showdown';
+      else if (mainTabId === 'security') resolvedSub = 'soc';
+      else resolvedSub = 'showdown';
     }
 
-    setActiveSubTab(resolvedSubTab);
+    setActiveSubTab(resolvedSub);
 
     if (typeof window !== 'undefined') {
-      window.location.hash = `${mainTabId}/${resolvedSubTab}`;
+      window.location.hash = mainTabId === 'security' ? 'security' : `${mainTabId}/${resolvedSub}`;
     }
   };
 
-  const handleGoToIntro = () => {
-    setPageMode('intro');
+  const handleSubTabChange = (newSubTab: string) => {
+    setActiveSubTab(newSubTab);
     if (typeof window !== 'undefined') {
-      window.location.hash = 'intro';
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.location.hash = `${activeMainTab}/${newSubTab}`;
     }
   };
 
-  const handleGoToFeatures = () => {
-    setPageMode('features');
-    if (typeof window !== 'undefined') {
-      window.location.hash = activeSubTab ? `${activeMainTab}/${activeSubTab}` : activeMainTab;
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  };
-
-  const handleSelectDemoStep = (step: number) => {
-    setDemoStep(step);
-    if (step === 1) handleSelectTab('silos', 'upload');
-    if (step === 2) handleSelectTab('engine', 'training');
-    if (step === 3) handleSelectTab('intelligence', 'showdown');
-  };
-
+  // Run 3-Min Pitch Walkthrough Automation across ALL 4 modules
   const handleToggleAutoDemo = () => {
-    if (pageMode !== 'features') {
-      setPageMode('features');
-    }
-
     if (isRunningAutoDemo) {
       setIsRunningAutoDemo(false);
       return;
     }
 
     setIsRunningAutoDemo(true);
-    handleSelectDemoStep(1);
+    // Step 1: Bank Payments
+    handleSelectMainTab('intelligence', 'showdown');
 
-    setTimeout(() => {
-      handleSelectDemoStep(2);
+    // Step 2: Credit Applications after 4.5s
+    const t1 = setTimeout(() => {
+      handleSelectMainTab('creditfraud', 'cf-showdown');
     }, 4500);
 
-    setTimeout(() => {
-      handleSelectDemoStep(3);
-      setIsRunningAutoDemo(false);
-    }, 10000);
-  };
+    // Step 3: Insurance Claims after 9s
+    const t2 = setTimeout(() => {
+      handleSelectMainTab('insurance', 'ins-showdown');
+    }, 9000);
 
-  const handleRunSimulationFromHero = () => {
-    handleSelectTab('engine', 'training');
+    // Step 4: Cybersecurity Gateway & Live Attack Defense after 13.5s
+    const t3 = setTimeout(() => {
+      handleSelectMainTab('security');
+    }, 13500);
+
+    // Step 5: Finish after 19s
+    const t4 = setTimeout(() => {
+      setIsRunningAutoDemo(false);
+    }, 19000);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      clearTimeout(t4);
+    };
   };
 
   return (
-    <div className={`relative min-h-screen bg-transparent text-slate-900 selection:bg-emerald-500/20 selection:text-emerald-900 ${colorVibe === 'emerald-cyan' ? 'vibe-emerald-cyan' : 'vibe-ocean-mint'} ${fontCombo === 'auge' ? 'font-combo-auge' : fontCombo === 'inter' ? 'font-combo-inter' : 'font-combo-jakarta'}`}>
-      {/* Dynamic Luminous Floating Pastel Orbs */}
-      <ParticlesBackground quantity={45} />
+    <div className={`min-h-screen flex flex-col transition-colors duration-200 ${
+      isDark ? 'bg-black text-[#F4F4F5]' : 'bg-[#FAF9F6] text-[#18181B]'
+    }`}>
+      {/* Top Persistent Header matching reference images */}
+      <SharedHeader
+        activeTab={activeMainTab}
+        onSelectTab={(tab) => handleSelectMainTab(tab)}
+        onRunDemo={handleToggleAutoDemo}
+        isRunningDemo={isRunningAutoDemo}
+      />
 
-      {/* Main Container */}
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-5 space-y-6">
-        
-        {/* Floating Top Navigation Bar matching Avela Reference */}
-        <header className="sticky top-4 z-40 flex items-center justify-between p-3.5 px-6 rounded-full bg-white/90 backdrop-blur-2xl border-2 border-blue-200/90 shadow-2xl shadow-emerald-500/15">
-          {/* Logo & Platform Name */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleGoToIntro}
-              className="flex items-center gap-3 cursor-pointer group text-left"
-            >
-              <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-blue-600 via-cyan-500 to-emerald-500 p-0.5 shadow-md shadow-emerald-500/20 group-hover:scale-105 transition-transform">
-                <div className="h-full w-full bg-white rounded-[10px] flex items-center justify-center text-emerald-600">
-                  <ShieldCheck className="w-5 h-5 animate-pulse" />
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-blue-600 via-cyan-500 to-emerald-500 bg-clip-text text-transparent font-display">
-                  OLYMPUS
-                </span>
-                <span className="hidden sm:inline-block px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold bg-gradient-to-r from-blue-100 to-emerald-100 text-emerald-800 border border-emerald-300">
-                  MVP v1.0
-                </span>
-              </div>
-            </button>
-          </div>
-
-          {/* Center: Live Privacy Telemetry Pills + Font & Color Live Switchers */}
-          <div className="hidden lg:flex items-center gap-2 text-xs font-mono">
-            {/* Blue & Green Color Palette Live Switcher */}
-            <button
-              onClick={() => setColorVibe(prev => prev === 'ocean-mint' ? 'emerald-cyan' : 'ocean-mint')}
-              className="btn-3d-glass px-3.5 py-1.5 rounded-full text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer text-emerald-800 hover:text-emerald-950 shadow-sm border-2 border-emerald-200 bg-emerald-50/60"
-              title="Click to toggle between bright Blue and Green themes: Ocean Mint and Emerald Cyan"
-            >
-              <span className="w-2.5 h-2.5 rounded-full bg-gradient-to-tr from-blue-500 to-emerald-400 animate-pulse" />
-              <span className="text-[10px] uppercase font-bold text-slate-400">Color:</span>
-              <span className="font-extrabold text-emerald-700">
-                {colorVibe === 'ocean-mint' ? '🌊 Ocean Mint' : '🌲 Emerald Cyan'}
-              </span>
-            </button>
-
-            {/* Font Combination Live Toggle Button */}
-            <button
-              onClick={() => setFontCombo(prev => prev === 'auge' ? 'inter' : prev === 'inter' ? 'jakarta' : 'auge')}
-              className="btn-3d-glass px-3.5 py-1.5 rounded-full text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer text-blue-800 hover:text-blue-950 shadow-sm border-2 border-blue-200 bg-blue-50/60"
-              title="Click to toggle font family between Auge, Inter, and Plus Jakarta"
-            >
-              <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-              <span className="text-[10px] uppercase font-bold text-slate-400">Font:</span>
-              <span className="font-extrabold text-blue-700">
-                {fontCombo === 'auge' ? 'Auge Complete' : fontCombo === 'inter' ? 'Inter + Mono' : 'Jakarta + DM'}
-              </span>
-            </button>
-
-            <div className="px-3 py-1.5 rounded-full bg-emerald-50 border-2 border-emerald-300 shadow-sm flex items-center gap-1.5 font-bold text-emerald-800">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-emerald-700 font-medium">Raw Records:</span>
-              <span className="text-emerald-600 font-extrabold">0</span>
-            </div>
-            <div className="px-3 py-1.5 rounded-full bg-blue-50 border-2 border-blue-300 shadow-sm flex items-center gap-1.5 font-bold text-blue-800">
-              <Lock className="w-3 h-3 text-blue-600" />
-              <span className="text-blue-700 font-medium">SecAgg+:</span>
-              <span className="text-blue-700 font-extrabold">3/3</span>
-            </div>
-            <div className="px-3 py-1.5 rounded-full bg-teal-50 border-2 border-teal-300 shadow-sm flex items-center gap-1.5 font-bold text-teal-800">
-              <span className="text-teal-700 font-medium">DP:</span>
-              <span className="text-teal-700 font-extrabold">ε=2.45</span>
-            </div>
-          </div>
-
-          {/* Right Action Buttons */}
-          <div className="flex items-center gap-3">
-            {pageMode === 'features' ? (
-              <>
-                <button
-                  onClick={handleGoToIntro}
-                  className="btn-3d-glass px-4 py-2 rounded-full text-xs font-bold flex items-center gap-1.5 cursor-pointer text-slate-700"
-                >
-                  <ArrowLeft className="w-3.5 h-3.5" />
-                  <span>Back to Intro</span>
-                </button>
-                <button
-                  onClick={handleToggleAutoDemo}
-                  className="btn-3d-primary px-4 py-2 rounded-full text-xs font-bold flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                  <span>{isRunningAutoDemo ? 'Pitch Playing...' : 'Run 3-Min Pitch'}</span>
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={handleGoToFeatures}
-                className="btn-3d-primary px-5 py-2 rounded-full text-xs font-bold flex items-center gap-2 cursor-pointer shadow-lg"
-              >
-                <span>Let's Start</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-        </header>
-
-        {/* PAGE CONTENT ROUTER: INTRO PAGE VS FEATURES PLATFORM */}
+      {/* Main Page Content with Smooth Transition */}
+      <main className="flex-1">
         <AnimatePresence mode="wait" initial={false}>
-          {pageMode === 'intro' ? (
+          {activeMainTab === 'intelligence' && (
             <motion.div
-              key="intro-page-container"
-              initial={{ opacity: 0, y: 15 }}
+              key="bank-payments-view"
+              initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.25 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
             >
-              <IntroPage
-                onStart={handleGoToFeatures}
-                onRunSimulation={handleRunSimulationFromHero}
+              <BankPaymentsView
+                subTab={activeSubTab}
+                onSubTabChange={handleSubTabChange}
               />
             </motion.div>
-          ) : (
+          )}
+
+          {activeMainTab === 'creditfraud' && (
             <motion.div
-              key="features-page-container"
-              initial={{ opacity: 0, y: 15 }}
+              key="credit-applications-view"
+              initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.25 }}
-              className="space-y-6"
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
             >
-              {/* 3 Main Tabs with Floating Hover Subtab Mega-Preview */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between px-2">
-                  <span className="text-xs font-mono uppercase text-blue-700 font-bold tracking-wider flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-blue-600" />
-                    Interactive Platform Modules (Hover to preview all subtabs)
-                  </span>
-                  <span className="text-xs text-slate-400 font-medium hidden sm:inline">
-                    Zero Raw Customer Records Shared • PRD §9-§13
-                  </span>
-                </div>
+              <CreditApplicationsView
+                subTab={activeSubTab}
+                onSubTabChange={handleSubTabChange}
+              />
+            </motion.div>
+          )}
 
-                <ModernTabsWithHover
-                  activeMainTab={activeMainTab}
-                  activeSubTab={activeSubTab}
-                  onSelectTab={handleSelectTab}
-                />
-              </div>
+          {activeMainTab === 'insurance' && (
+            <motion.div
+              key="insurance-claims-view"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
+            >
+              <InsuranceClaimsView
+                subTab={activeSubTab}
+                onSubTabChange={handleSubTabChange}
+              />
+            </motion.div>
+          )}
 
-              {/* Dynamic Main View: Tab 1 (PaySim), Tab 2 (CreditFraud), Tab 3 (Insurance) */}
-              <main className="min-h-[520px] pt-2">
-                {activeMainTab === 'intelligence' && (
-                  <IntelligenceAndGovView
-                    activeSubTab={activeSubTab}
-                    onSubTabChange={(subId) => {
-                      setActiveSubTab(subId);
-                      if (typeof window !== 'undefined') window.location.hash = `intelligence/${subId}`;
-                    }}
-                  />
-                )}
-                {activeMainTab === 'creditfraud' && (
-                  <CreditFraudView
-                    activeSubTab={activeSubTab}
-                    onSubTabChange={(subId) => {
-                      setActiveSubTab(subId);
-                      if (typeof window !== 'undefined') window.location.hash = `creditfraud/${subId}`;
-                    }}
-                  />
-                )}
-                {activeMainTab === 'insurance' && (
-                  <InsuranceClaimsView
-                    activeSubTab={activeSubTab}
-                    onSubTabChange={(subId) => {
-                      setActiveSubTab(subId);
-                      if (typeof window !== 'undefined') window.location.hash = `insurance/${subId}`;
-                    }}
-                  />
-                )}
-              </main>
+          {activeMainTab === 'security' && (
+            <motion.div
+              key="cybersecurity-gateway-view"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
+            >
+              <CybersecurityGatewayView />
             </motion.div>
           )}
         </AnimatePresence>
+      </main>
 
-        {/* Sleek Modern Footer matching reference image */}
-        <footer className="pt-12 pb-8 border-t border-slate-200/80 space-y-6">
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            <span className="px-4 py-1.5 rounded-full text-xs font-bold bg-white border border-slate-200 shadow-sm text-slate-700 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
-              Zero Customer Records Transmitted
-            </span>
-            <span className="px-4 py-1.5 rounded-full text-xs font-bold bg-white border border-slate-200 shadow-sm text-slate-700 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-cyan-500" />
-              Diffie-Hellman SecAgg+ Masking
-            </span>
-            <span className="px-4 py-1.5 rounded-full text-xs font-bold bg-white border border-slate-200 shadow-sm text-slate-700 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-teal-500" />
-              Rényi DP Differential Privacy (ε=2.45)
-            </span>
-            <span className="px-4 py-1.5 rounded-full text-xs font-bold bg-white border border-slate-200 shadow-sm text-slate-700 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-blue-500" />
-              NIST AI RMF Fairness & Drift Monitored
-            </span>
+      {/* Sleek Minimalist Footer in Pitch-Black / Milk-White */}
+      <footer className={`border-t py-8 px-4 sm:px-6 lg:px-8 transition-colors ${
+        isDark ? 'border-[#1C1C1C] bg-black text-[#71717A]' : 'border-[#E8E6E0] bg-[#FAF9F6] text-[#71717A]'
+      }`}>
+        <div className="max-w-[1720px] w-full mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
+          <div className="flex items-center gap-2">
+            <span className="font-extrabold tracking-widest uppercase font-mono text-[10px]">OLYMPUS</span>
+            <span>•</span>
+            <span>Decentralized Privacy-Preserving Fraud Intelligence Layer</span>
           </div>
-
-          <div className="text-center text-xs text-slate-500 space-y-1">
-            <p className="font-bold text-slate-800">
-              OLYMPUS • Privacy-Preserving Federated Fraud Intelligence Architecture
-            </p>
-            <p className="text-[11px] text-slate-400 font-mono">
-              "Institutions collaborate on intelligence, never on customer records." Designed for the ENIGMA Hackathon.
-            </p>
+          <div className="flex items-center gap-4 text-[11px] font-mono">
+            <span>Zero Customer PII Shared</span>
+            <span>•</span>
+            <span>SecAgg+ Masked</span>
+            <span>•</span>
+            <span>Rényi DP (ε=2.45)</span>
+            <span>•</span>
+            <span className="text-[#10B981]">Gateway Sieve Active</span>
           </div>
-        </footer>
-
-      </div>
+        </div>
+      </footer>
     </div>
+  );
+}
+
+export function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   );
 }
 
