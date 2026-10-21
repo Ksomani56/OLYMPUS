@@ -1,50 +1,15 @@
 @import "tailwindcss";
 
-/* Auge Complete Family Font Faces */
-@font-face {
-  font-family: 'Auge';
-  src: url('/fonts/auge/Auge-Trial-Regular-BF653b29344568e.otf') format('opentype');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Auge';
-  src: url('/fonts/auge/Auge-Trial-SemiBold-BF653b293480a32.otf') format('opentype');
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Auge';
-  src: url('/fonts/auge/Auge-Trial-Bold-BF653b29340422a.otf') format('opentype');
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Auge';
-  src: url('/fonts/auge/Auge-Trial-ExtraBold-BF653b293481e69.otf') format('opentype');
-  font-weight: 800;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Auge';
-  src: url('/fonts/auge/Auge-Trial-Black-BF653b29345b08a.otf') format('opentype');
-  font-weight: 900;
-  font-style: normal;
-  font-display: swap;
+@theme {
+  --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'JetBrains Mono', monospace;
+  --font-heading: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 :root {
-  --font-heading: 'Auge', 'Plus Jakarta Sans', serif;
-  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --font-heading: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-body: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'JetBrains Mono', monospace;
 
   /* Milk-white Light Mode Defaults */
   --bg-page: #FAF9F6;
@@ -119,6 +84,8 @@
 
 body {
   font-family: var(--font-body);
+  font-feature-settings: 'cv02' on, 'cv03' on;
+  letter-spacing: -0.011em;
   background-color: var(--bg-page);
   color: var(--text-primary);
   margin: 0;
@@ -131,12 +98,15 @@ body {
 /* Headings */
 h1, h2, h3, h4, h5, h6, .font-heading {
   font-family: var(--font-heading);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.024em;
+  font-weight: 600;
 }
 
 /* Monospace font */
 code, pre, .font-mono {
   font-family: var(--font-mono);
+  font-feature-settings: 'tnum' on, 'zero' on;
+  letter-spacing: -0.015em;
 }
 
 /* Custom transitions and button feedback per emil-design-eng */

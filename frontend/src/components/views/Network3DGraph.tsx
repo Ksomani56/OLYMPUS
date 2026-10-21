@@ -1,7 +1,20 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { createPortal } from 'react-dom';
 import * as THREE from 'three';
-import { Maximize2, Minimize2, RotateCcw, ZoomIn, ZoomOut, Eye, Shield, AlertTriangle } from 'lucide-react';
+import { 
+  Maximize2, 
+  Minimize2, 
+  RotateCcw, 
+  ZoomIn, 
+  ZoomOut, 
+  Eye, 
+  EyeOff, 
+  Tag, 
+  CircleDashed, 
+  Pause, 
+  Play, 
+  Shield, 
+  AlertTriangle 
+} from 'lucide-react';
 
 export interface Node3D {
   id: string;
@@ -56,9 +69,14 @@ export const Network3DGraph: React.FC<Network3DGraphProps> = ({
 }) => {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
 
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [autoRotate, setAutoRotate] = useState<boolean>(true);
+  const [showNames, setShowNames] = useState<boolean>(true);
+  const [showOrbits, setShowOrbits] = useState<boolean>(true);
+  const [freezeOrbits, setFreezeOrbits] = useState<boolean>(false);
   const [hoveredNode, setHoveredNode] = useState<Node3D | null>(null);
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
   const [screenLabels, setScreenLabels] = useState<Array<{ node: Node3D; x: number; y: number; visible: boolean }>>([]);
@@ -71,6 +89,9 @@ export const Network3DGraph: React.FC<Network3DGraphProps> = ({
     quarantinedNodes,
     isDark,
     autoRotate,
+    showNames,
+    showOrbits,
+    freezeOrbits,
     onSelectNode,
   });
 
@@ -82,9 +103,12 @@ export const Network3DGraph: React.FC<Network3DGraphProps> = ({
       quarantinedNodes,
       isDark,
       autoRotate,
+      showNames,
+      showOrbits,
+      freezeOrbits,
       onSelectNode,
     };
-  }, [isAttacking, attackType, attackerId, quarantinedNodes, isDark, autoRotate, onSelectNode]);
+  }, [isAttacking, attackType, attackerId, quarantinedNodes, isDark, autoRotate, showNames, showOrbits, freezeOrbits, onSelectNode]);
 
   // Spherical Camera Orientation State
   const cameraControlRef = useRef({
@@ -104,36 +128,122 @@ export const Network3DGraph: React.FC<Network3DGraphProps> = ({
     lastClickY: 0,
   });
 
-  // Toggle fullscreen mode with body scroll locking
-  const toggleFullscreen = () => {
-    setIsFullscreen((prev) => {
-      const next = !prev;
-      if (next) {
+  // Toggle fullscreen mode using native Fullscreen API with rock-solid CSS fallback
+  const toggleFullscreen = async () => {
+    const elem = containerRef.current;
+    if (!elem) return;
+
+    if (!document.fullscreenElement && !isFullscreen) {
+      try {
+        if (elem.requestFullscreen) {
+          await elem.requestFullscreen();
+        } else if ((elem as any).webkitRequestFullscreen) {
+          await (elem as any).webkitRequestFullscreen();
+        } else {
+          setIsFullscreen(true);
+        }
+      } catch {
+        // Fallback to CSS fullscreen
+        setIsFullscreen(true);
+      }
+    } else {
+      if (document.fullscreenElement) {
+        try {
+          if (document.exitFullscreen) {
+            await document.exitFullscreen();
+          } else if ((document as any).webkitExitFullscreen) {
+            await (document as any).webkitExitFullscreen();
+          }
+        } catch {
+          setIsFullscreen(false);
+        }
+      } else {
+        setIsFullscreen(false);
+      }
+    }
+  };
+
+  // Listen to native browser fullscreen transitions
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const isFs = Boolean(document.fullscreenElement === containerRef.current);
+      setIsFullscreen(isFs);
+      if (isFs) {
         document.body.style.overflow = 'hidden';
       } else {
         document.body.style.overflow = '';
       }
-      return next;
-    });
-  };
+    };
 
-  // Keyboard Escape listener
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.body.style.overflow = '';
+    };
+  }, []);
+
+  // Keyboard Escape listener for fallback fullscreen
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isFullscreen) {
-        setIsFullscreen(false);
-        document.body.style.overflow = '';
+        if (document.fullscreenElement) {
+          document.exitFullscreen().catch(() => {});
+        } else {
+          setIsFullscreen(false);
+          document.body.style.overflow = '';
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = '';
     };
   }, [isFullscreen]);
 
+  // Helper to dynamically calculate node security and quarantine state
+  const getNodeSecurityState = (
+    nodeId: string, 
+    defaultColor: string, 
+    defaultAtmosphere: string, 
+    defaultHash: string
+  ) => {
+    const isQuarantined = quarantinedNodes.includes(nodeId);
+    const isAttacker = attackerId === nodeId;
+
+    let trust = 100;
+    let hash = defaultHash;
+    let primaryColor = defaultColor;
+    let atmosphereColor = defaultAtmosphere;
+    let color = defaultColor;
+    let type: Node3D['type'] = isAttacker ? 'attacker' : 'bank';
+
+    if (isQuarantined) {
+      trust = 0;
+      hash = `sha256:${nodeId.toLowerCase()}...QUARANTINED`;
+      primaryColor = '#EF4444';
+      atmosphereColor = '#7F1D1D';
+      color = '#EF4444';
+      type = 'attacker';
+    } else if (isAttacker) {
+      trust = isAttacking ? 65 : 100;
+      hash = isAttacking ? `sha256:${nodeId.toLowerCase()}...eval` : defaultHash;
+      primaryColor = isAttacking ? '#EF4444' : defaultColor;
+      color = isAttacking ? '#EF4444' : defaultColor;
+    }
+
+    return { trust, hash, primaryColor, atmosphereColor, color, type };
+  };
+
   // Combine default consortium worlds + dynamically onboarded banks
   const allNodes: Node3D[] = useMemo(() => {
+    const bank1State = getNodeSecurityState('BANK-001', '#1E6CB5', '#2ECC71', 'sha256:8f2a93c...honest');
+    const bank2State = getNodeSecurityState('BANK-002', '#C44721', '#E28B62', 'sha256:4c1b98d...honest');
+    const bank3State = getNodeSecurityState('BANK-003', '#C4945A', '#6B401B', 'sha256:b1a03e...eval');
+    const insurer1State = getNodeSecurityState('INSURER-001', '#E2BF7D', '#BFA05A', 'sha256:9a3f2c...honest');
+
     const baseNodes: Node3D[] = [
       { 
         id: 'HUB', 
@@ -164,93 +274,93 @@ export const Network3DGraph: React.FC<Network3DGraphProps> = ({
       { 
         id: 'BANK-001', 
         label: 'BANK-001 (Commercial Banking)', 
-        type: 'bank', 
+        type: bank1State.type, 
         planetName: 'Earth (Terra)',
         planetCategory: 'earth',
         orbitRadius: 130,
         orbitSpeed: 0.006,
         orbitAngle: 0.8,
         orbitTiltX: 0.08,
-        primaryColor: '#1E6CB5', // Oceanic Sapphire
-        atmosphereColor: '#2ECC71', // Emerald continents & cyan glow
+        primaryColor: bank1State.primaryColor,
+        atmosphereColor: bank1State.atmosphereColor,
         x: 130, 
         y: 0, 
         z: 0, 
         vx: 0, 
         vy: 0, 
         vz: 0, 
-        color: '#2563EB', 
+        color: bank1State.color, 
         radius: 13, 
-        trust: 100,
+        trust: bank1State.trust,
         ip: '192.168.10.42 (Tier-1 Core)',
         jurisdiction: 'EU-GDPR / EBA',
         records: '6,362,620 txs',
-        hash: 'sha256:8f2a93c...honest'
+        hash: bank1State.hash
       },
       { 
         id: 'BANK-002', 
         label: 'BANK-002 (Digital Wallet)', 
-        type: 'bank', 
+        type: bank2State.type, 
         planetName: 'Mars (The Red Planet)',
         planetCategory: 'mars',
         orbitRadius: 190,
         orbitSpeed: 0.0048,
         orbitAngle: 2.3,
         orbitTiltX: 0.12,
-        primaryColor: '#C44721', // Rust Red
-        atmosphereColor: '#E28B62',
+        primaryColor: bank2State.primaryColor,
+        atmosphereColor: bank2State.atmosphereColor,
         x: 190, 
         y: 0, 
         z: 0, 
         vx: 0, 
         vy: 0, 
         vz: 0, 
-        color: '#EA580C', 
+        color: bank2State.color, 
         radius: 10.5, 
-        trust: 100,
+        trust: bank2State.trust,
         ip: '192.168.20.15 (FinTech Ingress)',
         jurisdiction: 'US-FedNow / OCC',
         records: '1,420,000 txs',
-        hash: 'sha256:4c1b98d...honest'
+        hash: bank2State.hash
       },
       { 
         id: 'BANK-003', 
         label: 'BANK-003 (Regional Enterprise)', 
-        type: attackerId === 'BANK-003' ? 'attacker' : 'bank', 
+        type: bank3State.type, 
         planetName: 'Jupiter (Gas Giant)',
         planetCategory: 'jupiter',
         orbitRadius: 265,
         orbitSpeed: 0.0032,
         orbitAngle: 3.9,
         orbitTiltX: 0.06,
-        primaryColor: quarantinedNodes.includes('BANK-003') || attackerId === 'BANK-003' ? '#EF4444' : '#C4945A', 
-        atmosphereColor: '#6B401B',
+        primaryColor: bank3State.primaryColor, 
+        atmosphereColor: bank3State.atmosphereColor,
         x: 265, 
         y: 0, 
         z: 0, 
         vx: 0, 
         vy: 0, 
         vz: 0, 
-        color: quarantinedNodes.includes('BANK-003') || attackerId === 'BANK-003' ? '#EF4444' : '#D97706', 
+        color: bank3State.color, 
         radius: 19, 
-        trust: quarantinedNodes.includes('BANK-003') ? 0 : 100,
+        trust: bank3State.trust,
         ip: '192.168.30.88 (Target Node)',
         jurisdiction: 'Regional Enterprise Core',
         records: '840,000 txs',
-        hash: quarantinedNodes.includes('BANK-003') ? 'sha256:de921a...QUARANTINED' : 'sha256:b1a03e...eval'
+        hash: bank3State.hash
       },
       { 
         id: 'INSURER-001', 
         label: 'INSURER-001 (P&C SIU Claims)', 
-        type: 'insurer', 
+        type: insurer1State.type === 'attacker' ? 'attacker' : 'insurer', 
         planetName: 'Saturn (Ringed World)',
         planetCategory: 'saturn',
         orbitRadius: 345,
         orbitSpeed: 0.0022,
         orbitAngle: 5.3,
         orbitTiltX: 0.16,
-        primaryColor: '#E2BF7D', // Honey Gold
-        atmosphereColor: '#BFA05A',
+        primaryColor: insurer1State.primaryColor,
+        atmosphereColor: insurer1State.atmosphereColor,
         hasRings: true,
         ringInner: 24,
         ringOuter: 44,
@@ -261,13 +371,13 @@ export const Network3DGraph: React.FC<Network3DGraphProps> = ({
         vx: 0, 
         vy: 0, 
         vz: 0, 
-        color: '#CA8A04', 
+        color: insurer1State.color, 
         radius: 16, 
-        trust: 100,
+        trust: insurer1State.trust,
         ip: '192.168.40.77 (SIU Forensics)',
         jurisdiction: 'NAIC Compliance Enclave',
         records: '1,000,000 policies',
-        hash: 'sha256:9a3f2c...honest'
+        hash: insurer1State.hash
       },
     ];
 
@@ -281,6 +391,7 @@ export const Network3DGraph: React.FC<Network3DGraphProps> = ({
     const added = customNodes.map((cn, idx) => {
       const template = planetTemplates[idx % planetTemplates.length];
       const orbitOffset = idx * 55;
+      const customNodeState = getNodeSecurityState(cn.id, template.color, template.atmosphere, cn.hash || 'sha256:custom...verified');
       return {
         ...cn,
         planetName: template.name,
@@ -289,19 +400,22 @@ export const Network3DGraph: React.FC<Network3DGraphProps> = ({
         orbitSpeed: template.speed,
         orbitAngle: 1.0 + idx * 1.5,
         orbitTiltX: 0.08 + (idx * 0.03),
-        primaryColor: template.color,
-        atmosphereColor: template.atmosphere,
+        primaryColor: customNodeState.primaryColor,
+        atmosphereColor: customNodeState.atmosphereColor,
         hasRings: template.hasRings,
         ringInner: template.ringInner,
         ringOuter: template.ringOuter,
         ringColor: template.ringColor,
         radius: template.radius,
-        color: template.color,
+        color: customNodeState.color,
+        trust: customNodeState.trust,
+        hash: customNodeState.hash,
+        type: customNodeState.type,
       } as Node3D;
     });
 
     return [...baseNodes, ...added];
-  }, [customNodes, attackerId, quarantinedNodes]);
+  }, [customNodes, attackerId, quarantinedNodes, isAttacking]);
 
   // Main Three.js Lifecycle
   useEffect(() => {
@@ -313,6 +427,8 @@ export const Network3DGraph: React.FC<Network3DGraphProps> = ({
 
     // 2. Camera Setup
     const camera = new THREE.PerspectiveCamera(45, 1, 10, 4000);
+    cameraRef.current = camera;
+
     const updateCameraPos = () => {
       const ctrl = cameraControlRef.current;
       const x = ctrl.radius * Math.sin(ctrl.phi) * Math.sin(ctrl.theta);
@@ -325,7 +441,9 @@ export const Network3DGraph: React.FC<Network3DGraphProps> = ({
 
     // 3. WebGL Renderer
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+    rendererRef.current = renderer;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setClearColor(isDark ? 0x05060A : 0xFAF9F6, 1);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.innerHTML = '';
@@ -333,39 +451,39 @@ export const Network3DGraph: React.FC<Network3DGraphProps> = ({
 
     // 4. Lighting System
     // Central Sun Point Light
-    const sunLight = new THREE.PointLight(0xFFEAA7, 3.2, 1800, 0.4);
+    const sunLight = new THREE.PointLight(0xFFEAA7, isDark ? 3.2 : 2.6, 1800, 0.4);
     sunLight.position.set(0, 0, 0);
     scene.add(sunLight);
 
-    // Subtle Ambient Light so night hemisphere retains elegant visible form
-    const ambientLight = new THREE.AmbientLight(isDark ? 0x1E1E2E : 0xF3EFE6, isDark ? 0.35 : 0.85);
+    // Ambient Light tuned for dark space or luminous celestial alabaster
+    const ambientLight = new THREE.AmbientLight(isDark ? 0x1E1E2E : 0xF4F3EE, isDark ? 0.45 : 0.85);
     scene.add(ambientLight);
 
-    // Soft Fill Directional Light for depth definition
-    const fillLight = new THREE.DirectionalLight(0xFFFFFF, isDark ? 0.25 : 0.4);
+    // Soft Fill Directional Light for depth and hemisphere contrast
+    const fillLight = new THREE.DirectionalLight(0xFFFFFF, isDark ? 0.35 : 0.65);
     fillLight.position.set(0, 200, 200);
     scene.add(fillLight);
 
-    // 5. Deep Space Twinkling Starfield
+    // 5. Starfield / Celestial Coordinates (Deep space specks or subtle slate coordinates)
     const starCount = 650;
     const starGeo = new THREE.BufferGeometry();
     const starPositions = new Float32Array(starCount * 3);
     const starColors = new Float32Array(starCount * 3);
 
-    const spectralPalette = isDark
-      ? [
-          new THREE.Color('#FFFFFF'), // Pure White
-          new THREE.Color('#BFDBFE'), // Blue Giant
-          new THREE.Color('#93C5FD'), // Deep Blue
-          new THREE.Color('#FEF08A'), // Solar Yellow
-          new THREE.Color('#FCA5A5'), // Red Dwarf
-          new THREE.Color('#E0E7FF'), // Pastel Indigo
-        ]
-      : [
-          new THREE.Color('#A1A1AA'),
-          new THREE.Color('#71717A'),
-          new THREE.Color('#52525B'),
-        ];
+    const spectralPalette = isDark ? [
+      new THREE.Color('#FFFFFF'), // Pure White
+      new THREE.Color('#BFDBFE'), // Blue Giant
+      new THREE.Color('#93C5FD'), // Deep Blue
+      new THREE.Color('#FEF08A'), // Solar Yellow
+      new THREE.Color('#FCA5A5'), // Red Dwarf
+      new THREE.Color('#E0E7FF'), // Pastel Indigo
+    ] : [
+      new THREE.Color('#94A3B8'), // Slate
+      new THREE.Color('#CBD5E1'), // Light Slate
+      new THREE.Color('#64748B'), // Steel
+      new THREE.Color('#A1A1AA'), // Zinc
+      new THREE.Color('#818CF8'), // Indigo dot
+    ];
 
     for (let i = 0; i < starCount; i++) {
       // Distribute stars on a wide celestial shell
@@ -387,10 +505,10 @@ export const Network3DGraph: React.FC<Network3DGraphProps> = ({
     starGeo.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
 
     const starMat = new THREE.PointsMaterial({
-      size: isDark ? 2.2 : 1.6,
+      size: isDark ? 2.2 : 1.5,
       vertexColors: true,
       transparent: true,
-      opacity: isDark ? 0.85 : 0.4,
+      opacity: isDark ? 0.85 : 0.45,
     });
     const starField = new THREE.Points(starGeo, starMat);
     scene.add(starField);
@@ -403,7 +521,7 @@ export const Network3DGraph: React.FC<Network3DGraphProps> = ({
     // Sun Photosphere Mesh
     const sunGeo = new THREE.SphereGeometry(solHub.radius, 36, 36);
     const sunMat = new THREE.MeshBasicMaterial({
-      color: 0xFFAA00,
+      color: 0xF59E0B,
     });
     const sunMesh = new THREE.Mesh(sunGeo, sunMat);
     (sunMesh as any).nodeData = solHub;
@@ -412,10 +530,10 @@ export const Network3DGraph: React.FC<Network3DGraphProps> = ({
     // Inner Pulsating Solar Corona
     const coronaGeo = new THREE.SphereGeometry(solHub.radius * 1.35, 32, 32);
     const coronaMat = new THREE.MeshBasicMaterial({
-      color: 0xFF7700,
+      color: isDark ? 0xFF7700 : 0xF59E0B,
       transparent: true,
-      opacity: 0.38,
-      blending: THREE.AdditiveBlending,
+      opacity: isDark ? 0.38 : 0.40,
+      blending: isDark ? THREE.AdditiveBlending : THREE.NormalBlending,
       side: THREE.BackSide,
     });
     const coronaMesh = new THREE.Mesh(coronaGeo, coronaMat);
@@ -424,10 +542,10 @@ export const Network3DGraph: React.FC<Network3DGraphProps> = ({
     // Outer Solar Atmosphere Glow
     const outerHaloGeo = new THREE.SphereGeometry(solHub.radius * 1.85, 32, 32);
     const outerHaloMat = new THREE.MeshBasicMaterial({
-      color: 0xFF4500,
+      color: isDark ? 0xFF4500 : 0xEA580C,
       transparent: true,
-      opacity: 0.18,
-      blending: THREE.AdditiveBlending,
+      opacity: isDark ? 0.18 : 0.16,
+      blending: isDark ? THREE.AdditiveBlending : THREE.NormalBlending,
       side: THREE.BackSide,
     });
     const outerHaloMesh = new THREE.Mesh(outerHaloGeo, outerHaloMat);
@@ -472,11 +590,12 @@ export const Network3DGraph: React.FC<Network3DGraphProps> = ({
       const orbitGeo = new THREE.BufferGeometry().setFromPoints(orbitPoints);
       const isQuarantined = quarantinedNodes.includes(node.id);
       const orbitMat = new THREE.LineBasicMaterial({
-        color: isQuarantined ? 0xEF4444 : isDark ? 0xFFFFFF : 0x000000,
+        color: isQuarantined ? 0xEF4444 : isDark ? 0xFFFFFF : 0x71717A,
         transparent: true,
-        opacity: isQuarantined ? 0.35 : isDark ? 0.12 : 0.10,
+        opacity: isQuarantined ? 0.35 : isDark ? 0.12 : 0.30,
       });
       const orbitLine = new THREE.LineLoop(orbitGeo, orbitMat);
+      orbitLine.visible = stateRef.current.showOrbits;
       scene.add(orbitLine);
 
       // Planet Sphere Geometry
@@ -573,8 +692,9 @@ export const Network3DGraph: React.FC<Network3DGraphProps> = ({
     const handleResize = () => {
       const containerElem = containerRef.current;
       if (!containerElem) return;
-      const width = isFullscreen ? window.innerWidth : containerElem.clientWidth || 1000;
-      const height = isFullscreen ? window.innerHeight : 460;
+      const isFs = Boolean(document.fullscreenElement === containerElem || containerElem.style.position === 'fixed');
+      const width = isFs ? window.innerWidth : containerElem.clientWidth || 1000;
+      const height = isFs ? window.innerHeight : 480;
 
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
@@ -679,9 +799,13 @@ export const Network3DGraph: React.FC<Network3DGraphProps> = ({
     // 10. Render & Animation Loop (60 FPS Silky Smooth)
     let animationFrameId: number;
     let tick = 0;
+    let orbitTick = 0;
 
     const animate = () => {
       tick++;
+      if (!stateRef.current.freezeOrbits) {
+        orbitTick++;
+      }
 
       const ctrl = cameraControlRef.current;
       if (stateRef.current.autoRotate && !ctrl.isDragging) {
@@ -717,7 +841,7 @@ export const Network3DGraph: React.FC<Network3DGraphProps> = ({
 
       planetEntries.forEach((entry) => {
         const r = entry.node.orbitRadius || 180;
-        const currentAngle = (entry.node.orbitAngle || 0) + tick * (entry.node.orbitSpeed || 0.005);
+        const currentAngle = (entry.node.orbitAngle || 0) + orbitTick * (entry.node.orbitSpeed || 0.005);
         const tilt = entry.node.orbitTiltX || 0.1;
 
         const px = Math.cos(currentAngle) * r;
@@ -725,11 +849,15 @@ export const Network3DGraph: React.FC<Network3DGraphProps> = ({
         const py = Math.sin(currentAngle) * r * Math.sin(tilt);
 
         entry.group.position.set(px, py, pz);
-        entry.planetMesh.rotation.y += 0.012; // Planet axial self-rotation
-
-        if (entry.ringMesh) {
-          entry.ringMesh.rotation.z += 0.003;
+        if (!stateRef.current.freezeOrbits) {
+          entry.planetMesh.rotation.y += 0.012; // Planet axial self-rotation
+          if (entry.ringMesh) {
+            entry.ringMesh.rotation.z += 0.003;
+          }
         }
+
+        // Toggle orbit line visibility dynamically
+        entry.orbitLine.visible = stateRef.current.showOrbits;
 
         // Update Telemetry Beam vector
         const positions = entry.telemetryLine.geometry.attributes.position.array as Float32Array;
@@ -782,140 +910,252 @@ export const Network3DGraph: React.FC<Network3DGraphProps> = ({
       renderer.dispose();
       starGeo.dispose();
       starMat.dispose();
+      rendererRef.current = null;
+      cameraRef.current = null;
     };
-  }, [allNodes, isFullscreen, isDark]);
+  }, [allNodes, isDark]);
+
+  // Synchronize canvas size when entering or exiting fullscreen without recreating the 3D scene
+  useEffect(() => {
+    const handleFsResize = () => {
+      const containerElem = containerRef.current;
+      const renderer = rendererRef.current;
+      const camera = cameraRef.current;
+      if (!containerElem || !renderer || !camera) return;
+
+      const isFs = Boolean(document.fullscreenElement === containerElem || isFullscreen);
+      const width = isFs ? window.innerWidth : (containerElem.clientWidth || 1000);
+      const height = isFs ? window.innerHeight : 480;
+
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height);
+    };
+
+    handleFsResize();
+    const timer = setTimeout(handleFsResize, 60);
+    return () => clearTimeout(timer);
+  }, [isFullscreen]);
 
   // Main UI Shell
   const content = (
     <div 
       ref={containerRef}
-      style={{ height: isFullscreen ? '100vh' : '480px', width: isFullscreen ? '100vw' : '100%' }}
-      className={`w-full overflow-hidden border border-subtle select-none ${
+      style={{ 
+        height: isFullscreen ? '100vh' : '480px', 
+        width: isFullscreen ? '100vw' : '100%',
+        position: isFullscreen ? 'fixed' : 'relative',
+        top: isFullscreen ? 0 : undefined,
+        left: isFullscreen ? 0 : undefined,
+        right: isFullscreen ? 0 : undefined,
+        bottom: isFullscreen ? 0 : undefined,
+        zIndex: isFullscreen ? 99999 : undefined,
+      }}
+      className={`w-full overflow-hidden select-none ${
         isFullscreen 
-          ? `fixed inset-0 z-[9999] rounded-none ${isDark ? 'bg-black text-white' : 'bg-[#FAF9F6] text-[#18181B]'}` 
-          : 'relative rounded-2xl h-[480px]'
+          ? (isDark ? 'rounded-none bg-[#05060A] text-white shadow-2xl' : 'rounded-none bg-[#FAF9F6] text-[#18181B] shadow-2xl') 
+          : (isDark ? 'rounded-2xl h-[480px] bg-[#05060A] border border-[#23232A] shadow-inner text-white' : 'rounded-2xl h-[480px] bg-[#FAF9F6] border border-[#E5E3DC] shadow-inner text-[#18181B]')
       }`}
     >
       {/* Three.js Canvas Container */}
       <div ref={mountRef} className="w-full h-full block" />
 
-      {/* 3D Projected Screen Labels (Planetarium Typography) */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        {screenLabels.map((item) => {
-          if (!item.visible) return null;
-          const isQuarantined = quarantinedNodes.includes(item.node.id);
-          const isHub = item.node.type === 'hub';
+      {/* 3D Projected Screen Labels (Planetarium Typography) - Can be toggled on/off */}
+      {showNames && (
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          {screenLabels.map((item) => {
+            if (!item.visible) return null;
+            // Hide label for the currently hovered node so it doesn't create messy overlapping text behind the HUD tooltip
+            if (hoveredNode && item.node.id === hoveredNode.id) return null;
 
-          return (
-            <div
-              key={item.node.id}
-              style={{
-                transform: `translate3d(${Math.round(item.x)}px, ${Math.round(item.y + item.node.radius + 14)}px, 0) translate(-50%, 0)`,
-              }}
-              className="absolute flex flex-col items-center pointer-events-none transition-transform duration-75"
-            >
-              <span className={`text-[11px] font-mono font-bold tracking-tight whitespace-nowrap px-1.5 py-0.5 rounded ${
-                isQuarantined
-                  ? 'bg-red-500/15 text-red-500'
-                  : isHub
-                  ? 'bg-amber-500/15 text-amber-500'
-                  : isDark
-                  ? 'text-zinc-200'
-                  : 'text-zinc-800'
-              }`}>
-                {item.node.label}
-              </span>
-              <span className={`text-[9px] font-mono tracking-tight whitespace-nowrap ${
-                isQuarantined
-                  ? 'text-red-500 font-bold'
-                  : isHub
-                  ? 'text-amber-500/80 font-medium'
-                  : isDark
-                  ? 'text-zinc-400'
-                  : 'text-zinc-500'
-              }`}>
-                {item.node.planetName} • TRUST {item.node.trust}/100
-              </span>
-            </div>
-          );
-        })}
-      </div>
+            // Prevent collision with the HUD tooltip
+            if (hoveredNode && mousePos) {
+              const dx = Math.abs(item.x - mousePos.x);
+              const dy = Math.abs(item.y - mousePos.y);
+              if (dx < 170 && dy < 130) return null;
+            }
 
-      {/* Floating HUD Tooltip when Hovering a Planet */}
-      {hoveredNode && mousePos && (
-        <div 
-          className={`absolute pointer-events-none z-30 p-3 rounded-xl border text-xs shadow-xl backdrop-blur-md max-w-xs transition-opacity duration-150 ${
-            isDark ? 'bg-black/90 border-[#333333] text-white' : 'bg-white/95 border-[#E2DFD7] text-[#18181B]'
-          }`}
-          style={{
-            left: Math.min(mousePos.x + 15, (containerRef.current?.clientWidth || 800) - 260),
-            top: Math.max(15, mousePos.y - 40),
-          }}
-        >
-          <div className="flex items-center justify-between border-b pb-1.5 border-subtle gap-3">
-            <span className="font-bold flex items-center gap-1.5">
-              <span className={`w-2 h-2 rounded-full ${quarantinedNodes.includes(hoveredNode.id) ? 'bg-[#EF4444]' : 'bg-[#10B981]'}`} />
-              <span>{hoveredNode.id}</span>
-            </span>
-            <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded font-bold ${
-              quarantinedNodes.includes(hoveredNode.id) ? 'bg-[#EF4444]/20 text-[#EF4444]' : 'bg-[#10B981]/20 text-[#10B981]'
-            }`}>
-              {quarantinedNodes.includes(hoveredNode.id) ? 'QUARANTINED' : 'ACTIVE'}
-            </span>
-          </div>
+            const isQuarantined = quarantinedNodes.includes(item.node.id);
+            const isHub = item.node.type === 'hub';
+            const labelTrust = isQuarantined ? 0 : item.node.trust;
 
-          <div className="pt-1.5 space-y-1 font-mono text-[11px]">
-            <div className="flex justify-between gap-4">
-              <span className="text-[#71717A]">Celestial Body:</span>
-              <span className="font-semibold text-amber-500">{hoveredNode.planetName || 'Consortium World'}</span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span className="text-[#71717A]">Peer Node:</span>
-              <span className="font-medium truncate">{hoveredNode.label}</span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span className="text-[#71717A]">Network IP:</span>
-              <span>{hoveredNode.ip || '10.240.x.x'}</span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span className="text-[#71717A]">Jurisdiction:</span>
-              <span>{hoveredNode.jurisdiction || 'Consortium Enclave'}</span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span className="text-[#71717A]">Trust Score:</span>
-              <span className={hoveredNode.trust >= 80 ? 'text-[#10B981] font-bold' : 'text-[#EF4444] font-bold'}>
-                {hoveredNode.trust}/100
-              </span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span className="text-[#71717A]">Hash Digest:</span>
-              <span className="text-[10px] truncate">{hoveredNode.hash || 'sha256:verified'}</span>
-            </div>
-          </div>
+            return (
+              <div
+                key={item.node.id}
+                style={{
+                  transform: `translate3d(${Math.round(item.x)}px, ${Math.round(item.y + item.node.radius + 14)}px, 0) translate(-50%, 0)`,
+                }}
+                className="absolute flex flex-col items-center pointer-events-none transition-transform duration-75"
+              >
+                <span className={`text-[11px] font-mono font-bold tracking-tight whitespace-nowrap px-1.5 py-0.5 rounded ${
+                  isQuarantined
+                    ? 'bg-red-500/20 text-red-500 border border-red-500/30'
+                    : isHub
+                    ? 'bg-amber-500/15 text-amber-500'
+                    : isDark
+                    ? 'text-zinc-200'
+                    : 'text-zinc-800'
+                }`}>
+                  {item.node.label}
+                </span>
+                <span className={`text-[9px] font-mono tracking-tight whitespace-nowrap ${
+                  isQuarantined
+                    ? 'text-red-500 font-bold'
+                    : isHub
+                    ? 'text-amber-500/80 font-medium'
+                    : isDark
+                    ? 'text-zinc-400'
+                    : 'text-zinc-500'
+                }`}>
+                  {item.node.planetName} • {isQuarantined ? 'QUARANTINED (TRUST 0/100)' : `TRUST ${labelTrust}/100`}
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
 
+      {/* Floating HUD Tooltip when Hovering a Planet */}
+      {hoveredNode && mousePos && (() => {
+        const isNodeQuarantined = quarantinedNodes.includes(hoveredNode.id);
+        const displayTrust = isNodeQuarantined ? 0 : hoveredNode.trust;
+        const displayHash = isNodeQuarantined 
+          ? (hoveredNode.hash?.includes('QUARANTINED') ? hoveredNode.hash : `sha256:${hoveredNode.id.toLowerCase()}...QUARANTINED`)
+          : (hoveredNode.hash || 'sha256:verified');
+        
+        const containerW = containerRef.current?.clientWidth || 800;
+        const containerH = containerRef.current?.clientHeight || 480;
+        const tooltipW = 280;
+        const leftPos = mousePos.x + tooltipW + 24 < containerW
+          ? mousePos.x + 20
+          : Math.max(12, mousePos.x - tooltipW - 20);
+        const topPos = Math.max(12, Math.min(containerH - 220, mousePos.y - 60));
+
+        return (
+          <div 
+            className={`absolute pointer-events-none z-50 p-3.5 rounded-xl border text-xs shadow-2xl backdrop-blur-md w-72 transition-opacity duration-150 ${
+              isDark ? 'bg-[#0B0B0B]/95 border-[#333333] text-white' : 'bg-white/98 border-[#D8D5CC] text-[#18181B]'
+            }`}
+            style={{
+              left: leftPos,
+              top: topPos,
+            }}
+          >
+            <div className="flex items-center justify-between border-b pb-1.5 border-subtle gap-3">
+              <span className="font-bold flex items-center gap-1.5">
+                <span className={`w-2 h-2 rounded-full ${isNodeQuarantined ? 'bg-[#EF4444]' : 'bg-[#10B981]'}`} />
+                <span className="font-mono">{hoveredNode.id}</span>
+              </span>
+              <span className={`font-mono text-[10px] px-2 py-0.5 rounded font-bold border ${
+                isNodeQuarantined 
+                  ? 'bg-[#EF4444]/20 border-[#EF4444]/40 text-[#EF4444]' 
+                  : 'bg-[#10B981]/20 border-[#10B981]/40 text-[#10B981]'
+              }`}>
+                {isNodeQuarantined ? 'QUARANTINED' : 'ACTIVE'}
+              </span>
+            </div>
+
+            <div className="pt-2 space-y-1.5 font-mono text-[11px]">
+              <div className="flex justify-between gap-4">
+                <span className="text-[#71717A]">Celestial Body:</span>
+                <span className="font-semibold text-amber-500">{hoveredNode.planetName || 'Consortium World'}</span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-[#71717A]">Peer Node:</span>
+                <span className="font-medium truncate max-w-[150px] text-right">{hoveredNode.label}</span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-[#71717A]">Network IP:</span>
+                <span>{hoveredNode.ip || '10.240.x.x'}</span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-[#71717A]">Jurisdiction:</span>
+                <span>{hoveredNode.jurisdiction || 'Consortium Enclave'}</span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-[#71717A]">Trust Score:</span>
+                <span className={isNodeQuarantined || displayTrust < 80 ? 'text-[#EF4444] font-bold' : 'text-[#10B981] font-bold'}>
+                  {displayTrust}/100
+                </span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-[#71717A]">Hash Digest:</span>
+                <span className={`text-[10px] truncate max-w-[160px] ${isNodeQuarantined ? 'text-[#EF4444] font-bold' : ''}`}>
+                  {displayHash}
+                </span>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* 3D Interaction Hints */}
       <div className={`absolute bottom-3 left-4 text-[11px] font-mono pointer-events-none ${
-        isDark ? 'text-[#71717A]' : 'text-[#8E8E93]'
+        isDark ? 'text-zinc-400' : 'text-zinc-600'
       }`}>
         <span>Left-click + drag to orbit Solar System • Scroll wheel to zoom • Click planet to inspect</span>
         {isFullscreen && <span className="ml-2 font-bold text-amber-500">• Press Esc to exit full screen</span>}
       </div>
 
       {/* Control Buttons Group (Top Right) */}
-      <div className="absolute top-4 right-4 flex items-center gap-2">
+      <div className="absolute top-4 right-4 flex flex-wrap items-center justify-end gap-1.5 sm:gap-2">
         {/* Gateway Shield Status Badge */}
-        <div className={`px-3 py-1.5 rounded-full text-[11px] font-mono font-bold flex items-center gap-2 border ${
+        <div className={`px-2.5 sm:px-3 py-1.5 rounded-full text-[11px] font-mono font-bold flex items-center gap-1.5 sm:gap-2 border ${
           isAttacking
             ? 'bg-[#260A0A] border-[#EF4444] text-[#F87171]'
-            : isDark
-            ? 'bg-[#062419] border-[#0D4A34] text-[#34D399]'
-            : 'bg-[#ECFDF5] border-[#A7F3D0] text-[#059669]'
+            : isDark 
+            ? 'bg-[#062419]/90 border-[#0D4A34] text-[#34D399]'
+            : 'bg-[#ECFDF5] border-[#A7F3D0] text-[#065F46]'
         }`}>
           <span className={`w-2 h-2 rounded-full ${isAttacking ? 'bg-[#EF4444] animate-ping' : 'bg-[#10B981]'}`} />
-          <span>{isAttacking ? 'GATEWAY: THREAT INTERCEPTED' : 'GATEWAY: SHIELD ACTIVE'}</span>
+          <span className="hidden sm:inline">{isAttacking ? 'GATEWAY: THREAT INTERCEPTED' : 'GATEWAY: SHIELD ACTIVE'}</span>
+          <span className="sm:hidden">{isAttacking ? 'THREAT' : 'SHIELD'}</span>
         </div>
+
+        {/* Toggle Names Button */}
+        <button
+          onClick={() => setShowNames((prev) => !prev)}
+          aria-label={showNames ? 'Hide node names' : 'Show node names'}
+          className={`p-2 rounded-xl border transition-all cursor-pointer flex items-center gap-1.5 text-xs font-semibold ${
+            !showNames
+              ? (isDark ? 'bg-[#18181B] border-[#3F3F46] text-[#71717A]' : 'bg-[#EAE7DF] border-[#D1CEC7] text-[#71717A]')
+              : (isDark ? 'bg-[#10B981]/20 border-[#10B981]/50 text-[#10B981]' : 'bg-[#10B981]/15 border-[#10B981]/40 text-[#047857]')
+          }`}
+          title={showNames ? 'Hide Node Names' : 'Show Node Names'}
+        >
+          {showNames ? <Tag className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+          <span className="hidden md:inline">{showNames ? 'Names' : 'Names Hidden'}</span>
+        </button>
+
+        {/* Toggle Orbit Lines Button */}
+        <button
+          onClick={() => setShowOrbits((prev) => !prev)}
+          aria-label={showOrbits ? 'Hide orbit paths' : 'Show orbit paths'}
+          className={`p-2 rounded-xl border transition-all cursor-pointer flex items-center gap-1.5 text-xs font-semibold ${
+            !showOrbits
+              ? (isDark ? 'bg-[#18181B] border-[#3F3F46] text-[#71717A]' : 'bg-[#EAE7DF] border-[#D1CEC7] text-[#71717A]')
+              : (isDark ? 'bg-[#10B981]/20 border-[#10B981]/50 text-[#10B981]' : 'bg-[#10B981]/15 border-[#10B981]/40 text-[#047857]')
+          }`}
+          title={showOrbits ? 'Hide Orbit Paths' : 'Show Orbit Paths'}
+        >
+          <CircleDashed className="w-3.5 h-3.5" />
+          <span className="hidden md:inline">{showOrbits ? 'Orbits' : 'Orbits Hidden'}</span>
+        </button>
+
+        {/* Freeze Orbit Button */}
+        <button
+          onClick={() => setFreezeOrbits((prev) => !prev)}
+          aria-label={freezeOrbits ? 'Unfreeze planetary orbits' : 'Freeze planetary orbits'}
+          className={`p-2 rounded-xl border transition-all cursor-pointer flex items-center gap-1.5 text-xs font-semibold ${
+            freezeOrbits
+              ? (isDark ? 'bg-amber-500/20 border-amber-500/50 text-amber-500 font-bold' : 'bg-amber-500/15 border-amber-500/40 text-amber-700 font-bold')
+              : (isDark ? 'bg-[#121216]/85 hover:bg-[#1E1E24] border-[#2E2E36] text-[#E4E4E7]' : 'bg-white/90 hover:bg-[#F4F3EE] border-[#D8D5CC] text-[#27272A] shadow-2xs')
+          }`}
+          title={freezeOrbits ? 'Unfreeze Planetary Motion' : 'Freeze Planetary Motion'}
+        >
+          {freezeOrbits ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
+          <span className="hidden md:inline">{freezeOrbits ? 'Frozen' : 'Freeze'}</span>
+        </button>
 
         {/* Zoom In */}
         <button
@@ -924,7 +1164,7 @@ export const Network3DGraph: React.FC<Network3DGraphProps> = ({
           }}
           aria-label="Zoom in 3D solar system"
           className={`p-2 rounded-xl border transition-all cursor-pointer ${
-            isDark ? 'bg-[#121212]/90 hover:bg-[#1C1C1C] border-[#262626] text-[#E4E4E7]' : 'bg-white/95 hover:bg-[#F4F2EC] border-[#E0DDD6] text-[#18181B] shadow-xs'
+            isDark ? 'bg-[#121216]/85 hover:bg-[#1E1E24] border-[#2E2E36] text-[#E4E4E7]' : 'bg-white/90 hover:bg-[#F4F3EE] border-[#D8D5CC] text-[#27272A] shadow-2xs'
           }`}
           title="Zoom In"
         >
@@ -938,7 +1178,7 @@ export const Network3DGraph: React.FC<Network3DGraphProps> = ({
           }}
           aria-label="Zoom out 3D solar system"
           className={`p-2 rounded-xl border transition-all cursor-pointer ${
-            isDark ? 'bg-[#121212]/90 hover:bg-[#1C1C1C] border-[#262626] text-[#E4E4E7]' : 'bg-white/95 hover:bg-[#F4F2EC] border-[#E0DDD6] text-[#18181B] shadow-xs'
+            isDark ? 'bg-[#121216]/85 hover:bg-[#1E1E24] border-[#2E2E36] text-[#E4E4E7]' : 'bg-white/90 hover:bg-[#F4F3EE] border-[#D8D5CC] text-[#27272A] shadow-2xs'
           }`}
           title="Zoom Out"
         >
@@ -948,13 +1188,13 @@ export const Network3DGraph: React.FC<Network3DGraphProps> = ({
         {/* Auto Rotate Toggle */}
         <button
           onClick={() => setAutoRotate((prev) => !prev)}
-          aria-label={autoRotate ? 'Pause auto-rotation' : 'Resume auto-rotation'}
+          aria-label={autoRotate ? 'Pause camera rotation' : 'Resume camera rotation'}
           className={`p-2 rounded-xl border transition-all cursor-pointer ${
             autoRotate
-              ? isDark ? 'bg-[#10B981]/15 border-[#10B981]/40 text-[#10B981]' : 'bg-[#ECFDF5] border-[#A7F3D0] text-[#059669]'
-              : isDark ? 'bg-[#121212]/90 border-[#262626] text-[#71717A]' : 'bg-white/95 border-[#E0DDD6] text-[#71717A]'
+              ? (isDark ? 'bg-[#10B981]/20 border-[#10B981]/50 text-[#10B981]' : 'bg-[#10B981]/15 border-[#10B981]/40 text-[#047857]')
+              : (isDark ? 'bg-[#121216]/85 border-[#2E2E36] text-[#8E8E93]' : 'bg-white/90 border-[#D8D5CC] text-[#A1A1AA] shadow-2xs')
           }`}
-          title={autoRotate ? 'Pause Rotation' : 'Enable Rotation'}
+          title={autoRotate ? 'Pause Camera Rotation' : 'Enable Camera Rotation'}
         >
           <RotateCcw className="w-3.5 h-3.5" />
         </button>
@@ -968,7 +1208,7 @@ export const Network3DGraph: React.FC<Network3DGraphProps> = ({
           }}
           aria-label="Reset 3D camera"
           className={`p-2 rounded-xl border transition-all cursor-pointer ${
-            isDark ? 'bg-[#121212]/90 hover:bg-[#1C1C1C] border-[#262626] text-[#E4E4E7]' : 'bg-white/95 hover:bg-[#F4F2EC] border-[#E0DDD6] text-[#18181B] shadow-xs'
+            isDark ? 'bg-[#121216]/85 hover:bg-[#1E1E24] border-[#2E2E36] text-[#E4E4E7]' : 'bg-white/90 hover:bg-[#F4F3EE] border-[#D8D5CC] text-[#27272A] shadow-2xs'
           }`}
           title="Reset Camera View"
         >
@@ -981,15 +1221,15 @@ export const Network3DGraph: React.FC<Network3DGraphProps> = ({
           aria-label={isFullscreen ? 'Exit full screen' : 'View model in full screen'}
           className={`p-2 px-3 rounded-xl border transition-all cursor-pointer flex items-center gap-1.5 text-xs font-semibold ${
             isDark 
-              ? 'bg-[#181818] hover:bg-[#222222] border-[#2C2C2C] text-[#E4E4E7]' 
-              : 'bg-white hover:bg-[#F4F2EC] border-[#D5D2C8] text-[#18181B] shadow-xs'
+              ? 'bg-[#121216]/85 hover:bg-[#1E1E24] border-[#2E2E36] text-[#E4E4E7]' 
+              : 'bg-white/90 hover:bg-[#F4F3EE] border-[#D8D5CC] text-[#27272A] shadow-2xs'
           }`}
           title={isFullscreen ? 'Exit full screen (Esc)' : 'View 3D model in full screen'}
         >
           {isFullscreen ? (
             <>
               <Minimize2 className="w-3.5 h-3.5" />
-              <span>Exit Full Screen</span>
+              <span>Exit Fullscreen</span>
             </>
           ) : (
             <>
@@ -1002,10 +1242,21 @@ export const Network3DGraph: React.FC<Network3DGraphProps> = ({
     </div>
   );
 
-  // If in fullscreen, render via createPortal directly into document.body to prevent parent clipping/transform issues!
-  if (isFullscreen && typeof document !== 'undefined') {
-    return createPortal(content, document.body);
-  }
-
-  return content;
+  return (
+    <>
+      {isFullscreen && (
+        <div 
+          aria-hidden="true" 
+          className={`w-full h-[480px] rounded-2xl flex flex-col items-center justify-center gap-2.5 ${
+            isDark ? 'bg-[#05060A] border border-[#23232A] text-zinc-400' : 'bg-[#FAF9F6] border border-[#E5E3DC] text-zinc-600'
+          }`}
+        >
+          <div className="w-2.5 h-2.5 rounded-full bg-[#10B981] animate-ping" />
+          <span className="text-xs font-mono font-medium">3D Topology Active in Fullscreen Mode</span>
+          <span className="text-[11px] font-mono text-zinc-500">Press Esc or click 'Exit Fullscreen' to return</span>
+        </div>
+      )}
+      {content}
+    </>
+  );
 };

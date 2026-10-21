@@ -74,3 +74,20 @@ export async function assessRisk(domain, userInput, includeAiReasoning = true) {
     },
   };
 }
+
+export async function verifySecurityPipeline(payload) {
+  const base = cachedWorkingBase || (await getWorkingBase());
+  const response = await fetch(`${base}/api/security/verify-pipeline`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || `Security pipeline returned ${response.status}`);
+  }
+
+  return await response.json();
+}
+

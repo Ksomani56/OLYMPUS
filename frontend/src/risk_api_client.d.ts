@@ -5,3 +5,12 @@ export declare function assessRisk(
   userInput: Record<string, any>,
   includeAiReasoning?: boolean
 ): Promise<any>;
+
+export declare function verifySecurityPipeline(payload: {
+  client_id: string;
+  payload_type: string;
+  epsilon?: number;
+  round_id?: number;
+  sample_count?: number;
+}): Promise<any>;
+

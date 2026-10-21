@@ -54,7 +54,7 @@ GEMINI_MODEL_PREFERENCE = [
 ]
 _GEMINI_MODELS_CACHE = None
 
-app = FastAPI(title="ENIGMA Risk Inference API", version="1.0.0")
+app = FastAPI(title="OLYMPUS Risk Inference API", version="1.0.0")
 origins = [value.strip() for value in os.getenv(
     "FRONTEND_ORIGINS", "http://localhost:3000,http://localhost:5173"
 ).split(",") if value.strip()]
@@ -482,7 +482,7 @@ def status():
 @app.get("/")
 def root():
     return {
-        "service": "ENIGMA Risk Inference API",
+        "service": "OLYMPUS Risk Inference API",
         "status": "running",
         "health": "/health",
         "status_endpoint": "/status",

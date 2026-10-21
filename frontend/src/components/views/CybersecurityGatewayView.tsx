@@ -33,6 +33,7 @@ import {
   Key
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { verifySecurityPipeline } from '../../risk_api_client';
 import { Network3DGraph, Node3D } from './Network3DGraph';
 
 export const CybersecurityGatewayView: React.FC = () => {
@@ -447,22 +448,15 @@ export const CybersecurityGatewayView: React.FC = () => {
       // Try calling backend Python endpoint
       let data: any = null;
       try {
-        const res = await fetch('http://127.0.0.1:8000/api/security/verify-pipeline', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            client_id: clientId,
-            payload_type: testPayloadType,
-            epsilon: pipelineEpsilon,
-            round_id: 15,
-            sample_count: 500,
-          }),
+        data = await verifySecurityPipeline({
+          client_id: clientId,
+          payload_type: testPayloadType,
+          epsilon: pipelineEpsilon,
+          round_id: 15,
+          sample_count: 500,
         });
-        if (res.ok) {
-          data = await res.json();
-        }
       } catch (err) {
-        // Fallback gracefully if network drops
+        // Fallback gracefully if network drops or backend offline
       }
 
       // Deterministic evaluation guarantee
@@ -558,7 +552,7 @@ export const CybersecurityGatewayView: React.FC = () => {
               </span>
               <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-ping" />
             </div>
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold font-serif tracking-tight">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold font-heading tracking-tight">
               Federated Security Gateway
             </h1>
             <p className={`text-sm sm:text-base max-w-2xl ${
@@ -571,7 +565,7 @@ export const CybersecurityGatewayView: React.FC = () => {
           {/* Quick Metrics */}
           <div className="flex items-center gap-6 sm:gap-8 shrink-0">
             <div className="space-y-0.5">
-              <div className="text-2xl sm:text-3xl font-bold font-serif text-[#10B981]">0.7933</div>
+              <div className="text-2xl sm:text-3xl font-bold font-mono text-[#10B981]">0.7933</div>
               <div className={`text-[11px] leading-tight ${isDark ? 'text-[#8E8E93]' : 'text-[#71717A]'}`}>
                 Protected ROC-AUC<br />
                 <span className="font-mono text-[10px] opacity-80">(0% Poison Leakage)</span>
@@ -579,7 +573,7 @@ export const CybersecurityGatewayView: React.FC = () => {
             </div>
 
             <div className="space-y-0.5">
-              <div className="text-2xl sm:text-3xl font-bold font-serif text-[#EF4444]">
+              <div className="text-2xl sm:text-3xl font-bold font-mono text-[#EF4444]">
                 {quarantinedNodes.length}
               </div>
               <div className={`text-[11px] leading-tight ${isDark ? 'text-[#8E8E93]' : 'text-[#71717A]'}`}>
@@ -589,7 +583,7 @@ export const CybersecurityGatewayView: React.FC = () => {
             </div>
 
             <div className="space-y-0.5">
-              <div className="text-2xl sm:text-3xl font-bold font-serif text-[#3B82F6]">100%</div>
+              <div className="text-2xl sm:text-3xl font-bold font-mono text-[#3B82F6]">100%</div>
               <div className={`text-[11px] leading-tight ${isDark ? 'text-[#8E8E93]' : 'text-[#71717A]'}`}>
                 Consensus Integrity<br />
                 <span className="font-mono text-[10px] opacity-80">(SHA-256 Sieve)</span>
@@ -655,11 +649,11 @@ export const CybersecurityGatewayView: React.FC = () => {
               vz: 0,
               color: '#8B5CF6',
               radius: 13,
-              trust: inst.trust,
+              trust: quarantinedNodes.includes(inst.id) ? 0 : inst.trust,
               ip: inst.ip,
               jurisdiction: inst.jurisdiction,
               records: inst.records,
-              hash: inst.hash,
+              hash: quarantinedNodes.includes(inst.id) ? `sha256:${inst.id.toLowerCase()}...QUARANTINED` : inst.hash,
             }))}
           />
         </div>
@@ -865,7 +859,9 @@ export const CybersecurityGatewayView: React.FC = () => {
                       />
                     </div>
 
-                    <div className="p-3 rounded-xl border border-subtle space-y-1 font-mono text-[11px] bg-black/10">
+                    <div className={`p-3 rounded-xl border border-subtle space-y-1 font-mono text-[11px] ${
+                      isDark ? 'bg-black/40 text-zinc-300' : 'bg-[#F2EFE9] text-zinc-800'
+                    }`}>
                       <div className="text-[#71717A]">Gaussian Perturbation Formula:</div>
                       <div className="font-bold text-amber-500">σ = √(2·ln(1.25/δ)) · C / ε</div>
                       <div className="text-[10px] opacity-75">where C = 1.0 (L2 Clip Bound), δ = 10⁻⁵</div>
@@ -1419,20 +1415,37 @@ export const CybersecurityGatewayView: React.FC = () => {
               {/* Table of Participant Nodes */}
               <div className="space-y-3">
                 {[
-                  { id: 'BANK-001', name: 'Commercial Banking Consortium', role: 'Honest Node', trust: 100, status: 'ACTIVE' },
-                  { id: 'BANK-002', name: 'Digital Wallet Micro-Lending', role: 'Honest Node', trust: 100, status: 'ACTIVE' },
-                  { id: 'INSURER-001', name: 'P&C SIU Claims Syndicate', role: 'Honest Node', trust: 100, status: 'ACTIVE' },
-                  { 
-                    id: 'BANK-003', 
-                    name: 'Regional Enterprise Bank (Target Node)', 
-                    role: 'Injected Adversary', 
-                    trust: attackerTrust, 
-                    status: quarantinedNodes.includes('BANK-003') ? 'QUARANTINED' : isSimulating && currentPhase >= 2 ? 'MONITORED' : 'ACTIVE' 
-                  },
-                  ...customInstitutions,
-                ].map((node) => {
-                  const isNodeQuarantined = node.status === 'QUARANTINED';
-                  const isMonitored = node.status === 'MONITORED';
+                  { id: 'BANK-001', name: 'Commercial Banking Consortium', defaultRole: 'Honest Node' },
+                  { id: 'BANK-002', name: 'Digital Wallet Micro-Lending', defaultRole: 'Honest Node' },
+                  { id: 'INSURER-001', name: 'P&C SIU Claims Syndicate', defaultRole: 'Honest Node' },
+                  { id: 'BANK-003', name: 'Regional Enterprise Bank (Target Node)', defaultRole: 'Injected Adversary' },
+                  ...customInstitutions.map(c => ({ id: c.id, name: c.name, defaultRole: c.role })),
+                ].map((nodeDef) => {
+                  const isNodeQuarantined = quarantinedNodes.includes(nodeDef.id);
+                  const isTarget = targetNode === nodeDef.id;
+                  const isMonitored = isSimulating && currentPhase >= 2 && isTarget;
+
+                  let status: 'QUARANTINED' | 'MONITORED' | 'ACTIVE' = 'ACTIVE';
+                  let trust = 100;
+                  let role = nodeDef.defaultRole;
+
+                  if (isNodeQuarantined) {
+                    status = 'QUARANTINED';
+                    trust = 0;
+                    role = isTarget ? 'Quarantined Adversary' : 'Quarantined Node';
+                  } else if (isTarget) {
+                    trust = attackerTrust;
+                    status = isMonitored ? 'MONITORED' : 'ACTIVE';
+                    role = 'Injected Adversary';
+                  }
+
+                  const node = {
+                    id: nodeDef.id,
+                    name: nodeDef.name,
+                    role,
+                    trust,
+                    status,
+                  };
 
                   return (
                     <div
@@ -1467,7 +1480,9 @@ export const CybersecurityGatewayView: React.FC = () => {
                           }`}>
                             {node.trust} / 100
                           </div>
-                          <div className="w-20 h-1.5 bg-[#262626] rounded-full overflow-hidden mt-1">
+                          <div className={`w-20 h-1.5 rounded-full overflow-hidden mt-1 ${
+                            isDark ? 'bg-[#262626]' : 'bg-[#EAE7DF]'
+                          }`}>
                             <div
                               className={`h-full rounded-full transition-all duration-500 ${
                                 node.trust >= 80 ? 'bg-[#10B981]' : node.trust >= 40 ? 'bg-amber-500' : 'bg-[#EF4444]'
