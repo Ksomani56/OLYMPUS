@@ -30,11 +30,17 @@ import {
   Eye,
   Sliders,
   Cpu,
-  Key
+  Key,
+  Globe,
+  Orbit
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { verifySecurityPipeline } from '../../risk_api_client';
 import { Network3DGraph, Node3D } from './Network3DGraph';
+import { ConsortiumGlobe3D } from './ConsortiumGlobe3D';
+import { GradientInversionSimulator } from './GradientInversionSimulator';
+import { SoarEngineView } from './SoarEngineView';
+import { TimeTravelScrubber } from './TimeTravelScrubber';
 
 export const CybersecurityGatewayView: React.FC = () => {
   const { theme } = useTheme();
@@ -48,11 +54,50 @@ export const CybersecurityGatewayView: React.FC = () => {
   const [attackStrength, setAttackStrength] = useState<'LOW' | 'MEDIUM' | 'HIGH'>('HIGH');
   const [inspectorTab, setInspectorTab] = useState<'formula' | 'tensor' | 'sieve'>('formula');
 
+  // 3D Topology View Switcher & Time-Travel Scrubber State
+  const [topologyViewMode, setTopologyViewMode] = useState<'orrery' | 'globe'>('orrery');
+  const [timelineRound, setTimelineRound] = useState<number>(18);
+  const [isEmergencyFrozen, setIsEmergencyFrozen] = useState<boolean>(false);
+
   // Animation Sequence State
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
   const [currentPhase, setCurrentPhase] = useState<number>(0); // 0: Idle, 1: Transmitting, 2: Gateway Interception, 3: Quarantine & Deflection, 4: Protected Aggregation
   const [quarantinedNodes, setQuarantinedNodes] = useState<string[]>([]);
   const [attackerTrust, setAttackerTrust] = useState<number>(100);
+
+  // SOAR Parole / Rehabilitation Handler
+  const handleRestoreNode = (nodeId: string) => {
+    setQuarantinedNodes(prev => prev.filter(id => id !== nodeId));
+    if (nodeId === targetNode) {
+      setAttackerTrust(85);
+    }
+  };
+
+  // Time-Travel Scrubber Sync Handler
+  const handleRoundScrub = (round: number) => {
+    setTimelineRound(round);
+    if (round <= 13) {
+      setQuarantinedNodes([]);
+      setAttackerTrust(100);
+      setCurrentPhase(0);
+    } else if (round === 14) {
+      setQuarantinedNodes([]);
+      setAttackerTrust(100);
+      setCurrentPhase(1);
+    } else if (round === 15) {
+      setQuarantinedNodes([]);
+      setAttackerTrust(40);
+      setCurrentPhase(2);
+    } else if (round === 16) {
+      setQuarantinedNodes([targetNode]);
+      setAttackerTrust(24);
+      setCurrentPhase(3);
+    } else {
+      setQuarantinedNodes([targetNode]);
+      setAttackerTrust(24);
+      setCurrentPhase(4);
+    }
+  };
 
   // Dynamic Institution Onboarding State
   const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState<boolean>(false);
@@ -357,10 +402,11 @@ export const CybersecurityGatewayView: React.FC = () => {
 
   // Launch Live Animated Sequence
   const handleLaunchAttack = () => {
-    if (isSimulating) return;
+    if (isSimulating || isEmergencyFrozen) return;
 
     setIsSimulating(true);
     setCurrentPhase(1); // Phase 1: Transmitting
+    setTimelineRound(14);
     setQuarantinedNodes([]);
     setAttackerTrust(100);
 
@@ -369,12 +415,14 @@ export const CybersecurityGatewayView: React.FC = () => {
     // Phase 2: Gateway Interception (after 1.4s)
     setTimeout(() => {
       setCurrentPhase(2);
+      setTimelineRound(15);
       setAttackerTrust(65);
     }, 1400);
 
     // Phase 3: Quarantine & Deflection (after 2.8s)
     setTimeout(() => {
       setCurrentPhase(3);
+      setTimelineRound(16);
       setQuarantinedNodes([targetNode]);
       setAttackerTrust(0);
 
@@ -396,6 +444,7 @@ export const CybersecurityGatewayView: React.FC = () => {
     // Phase 4: Protected Aggregation (after 4.2s)
     setTimeout(() => {
       setCurrentPhase(4);
+      setTimelineRound(18);
       setIsSimulating(false);
     }, 4200);
   };
@@ -403,6 +452,7 @@ export const CybersecurityGatewayView: React.FC = () => {
   const handleReset = () => {
     setIsSimulating(false);
     setCurrentPhase(0);
+    setTimelineRound(18);
     setQuarantinedNodes([]);
     setAttackerTrust(100);
   };
@@ -607,8 +657,39 @@ export const CybersecurityGatewayView: React.FC = () => {
               </p>
             </div>
 
-            {/* Live Animation Status Pill */}
-            <div className="flex items-center gap-2">
+            {/* Top Bar Controls: 3D View Switcher & Live Animation Status Pill */}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* 3D View Mode Toggle */}
+              <div className={`flex items-center gap-1 p-1 rounded-xl border ${
+                isDark ? 'bg-black/60 border-white/10' : 'bg-slate-100 border-black/10'
+              }`}>
+                <button
+                  onClick={() => setTopologyViewMode('orrery')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-mono font-semibold flex items-center gap-1.5 transition-all ${
+                    topologyViewMode === 'orrery'
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-xs'
+                      : 'opacity-60 hover:opacity-100'
+                  }`}
+                  title="Keplerian Planetary Orrery View"
+                >
+                  <Orbit className="w-3.5 h-3.5" />
+                  <span>Solar Orrery</span>
+                </button>
+                <button
+                  onClick={() => setTopologyViewMode('globe')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-mono font-semibold flex items-center gap-1.5 transition-all ${
+                    topologyViewMode === 'globe'
+                      ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-xs'
+                      : 'opacity-60 hover:opacity-100'
+                  }`}
+                  title="3D Earth Consortium Geolocation View"
+                >
+                  <Globe className="w-3.5 h-3.5" />
+                  <span>3D Globe View</span>
+                </button>
+              </div>
+
+              {/* Live Animation Status Pill */}
               <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold border flex items-center gap-2 ${
                 currentPhase === 1 ? 'bg-[#181818] border-[#A1A1AA] text-white animate-pulse'
                 : currentPhase === 2 ? 'bg-[#260A0A] border-[#EF4444] text-[#F87171] animate-pulse'
@@ -630,31 +711,69 @@ export const CybersecurityGatewayView: React.FC = () => {
             </div>
           </div>
 
-          {/* Interactive 3D Canvas */}
-          <Network3DGraph
-            isAttacking={isSimulating || quarantinedNodes.length > 0}
-            attackType={selectedAttack}
-            attackerId={targetNode}
-            quarantinedNodes={quarantinedNodes}
+          {/* Interactive 3D Canvas Switcher (Preserves WebGL Context without re-mounting) */}
+          <div style={{ display: topologyViewMode === 'orrery' ? 'block' : 'none' }}>
+            <Network3DGraph
+              isAttacking={isSimulating || quarantinedNodes.length > 0}
+              attackType={selectedAttack}
+              attackerId={targetNode}
+              quarantinedNodes={quarantinedNodes}
+              isDark={isDark}
+              customNodes={customInstitutions.map(inst => ({
+                id: inst.id,
+                label: inst.name,
+                type: 'bank',
+                x: 0,
+                y: 0,
+                z: 0,
+                vx: 0,
+                vy: 0,
+                vz: 0,
+                color: '#8B5CF6',
+                radius: 13,
+                trust: quarantinedNodes.includes(inst.id) ? 0 : inst.trust,
+                ip: inst.ip,
+                jurisdiction: inst.jurisdiction,
+                records: inst.records,
+                hash: quarantinedNodes.includes(inst.id) ? `sha256:${inst.id.toLowerCase()}...QUARANTINED` : inst.hash,
+              }))}
+            />
+          </div>
+
+          <div style={{ display: topologyViewMode === 'globe' ? 'block' : 'none' }}>
+            <ConsortiumGlobe3D
+              isAttacking={isSimulating || quarantinedNodes.length > 0}
+              attackType={selectedAttack}
+              attackerId={targetNode}
+              quarantinedNodes={quarantinedNodes}
+              isDark={isDark}
+              customNodes={customInstitutions.map(inst => ({
+                id: inst.id,
+                label: inst.name,
+                type: 'bank',
+                x: 0,
+                y: 0,
+                z: 0,
+                vx: 0,
+                vy: 0,
+                vz: 0,
+                color: '#8B5CF6',
+                radius: 5,
+                trust: quarantinedNodes.includes(inst.id) ? 0 : inst.trust,
+                ip: inst.ip,
+                jurisdiction: inst.jurisdiction,
+                records: inst.records,
+                hash: quarantinedNodes.includes(inst.id) ? `sha256:${inst.id.toLowerCase()}...QUARANTINED` : inst.hash,
+              }))}
+            />
+          </div>
+
+          {/* Temporal Time-Travel Scrubber */}
+          <TimeTravelScrubber
+            currentRound={timelineRound}
+            maxRound={18}
+            onRoundChange={handleRoundScrub}
             isDark={isDark}
-            customNodes={customInstitutions.map(inst => ({
-              id: inst.id,
-              label: inst.name,
-              type: 'bank',
-              x: 0,
-              y: 0,
-              z: 0,
-              vx: 0,
-              vy: 0,
-              vz: 0,
-              color: '#8B5CF6',
-              radius: 13,
-              trust: quarantinedNodes.includes(inst.id) ? 0 : inst.trust,
-              ip: inst.ip,
-              jurisdiction: inst.jurisdiction,
-              records: inst.records,
-              hash: quarantinedNodes.includes(inst.id) ? `sha256:${inst.id.toLowerCase()}...QUARANTINED` : inst.hash,
-            }))}
           />
         </div>
 
@@ -1218,17 +1337,25 @@ export const CybersecurityGatewayView: React.FC = () => {
               <div className="pt-2 space-y-2.5">
                 <button
                   onClick={handleLaunchAttack}
-                  disabled={isSimulating}
+                  disabled={isSimulating || isEmergencyFrozen}
                   className={`w-full py-3.5 px-4 rounded-full text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-all ${
-                    isSimulating
+                    isEmergencyFrozen
+                      ? 'bg-red-500/20 text-red-400 border border-red-500/30 cursor-not-allowed'
+                      : isSimulating
                       ? 'bg-amber-500 text-black animate-pulse'
                       : isDark
                       ? 'bg-white text-black hover:bg-[#E4E4E7] shadow-sm'
                       : 'bg-white border border-[#D1CEC4] text-[#18181B] hover:bg-[#F4F2EC] hover:border-[#BCB9AF] shadow-xs'
                   }`}
                 >
-                  <Zap className={`w-4 h-4 ${isSimulating ? 'text-black' : isDark ? 'text-black' : 'text-[#18181B]'}`} />
-                  <span>{isSimulating ? 'Executing Attack Sequence...' : 'Launch Live Attack & Run Round'}</span>
+                  <Zap className={`w-4 h-4 ${isEmergencyFrozen ? 'text-red-400' : isSimulating ? 'text-black' : isDark ? 'text-black' : 'text-[#18181B]'}`} />
+                  <span>
+                    {isEmergencyFrozen
+                      ? 'Consortium Frozen (SOAR Emergency Active)'
+                      : isSimulating
+                      ? 'Executing Attack Sequence...'
+                      : 'Launch Live Attack & Run Round'}
+                  </span>
                 </button>
 
                 {quarantinedNodes.length > 0 && (
@@ -1634,6 +1761,18 @@ export const CybersecurityGatewayView: React.FC = () => {
           </div>
 
         </div>
+
+        {/* ================= GRADIENT INVERSION DEFENSE SIMULATOR (DATA LEAKAGE PROBER) ================= */}
+        <GradientInversionSimulator isDark={isDark} />
+
+        {/* ================= SOAR AUTOMATED INCIDENT RESPONSE & PLAYBOOK ENGINE ================= */}
+        <SoarEngineView 
+          isDark={isDark}
+          quarantinedNodes={quarantinedNodes}
+          onRestoreNode={handleRestoreNode}
+          isEmergencyFrozen={isEmergencyFrozen}
+          onToggleEmergencyFreeze={setIsEmergencyFrozen}
+        />
 
         {/* ================= POPULATED AUDIT DATABASE & TRANSACTION HASHING TABLE ================= */}
         <div className={`p-6 rounded-3xl border ${
